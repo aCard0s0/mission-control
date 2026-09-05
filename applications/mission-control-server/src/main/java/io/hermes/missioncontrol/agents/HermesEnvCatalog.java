@@ -30,7 +30,7 @@ final class HermesEnvCatalog {
    */
   static final List<ApiKeySpec> API_KEYS = List.of(
       ApiKeySpec.forProvider("openrouter", "OpenRouter"),
-      ApiKeySpec.forProvider("openai", "OpenAI"),
+      ApiKeySpec.forProvider("openai-api", "OpenAI"),
       ApiKeySpec.forProvider("anthropic", "Anthropic", "ANTHROPIC_TOKEN"),
       ApiKeySpec.forProvider("gemini", "Google / Gemini", "GEMINI_API_KEY"),
       ApiKeySpec.forProvider("deepseek", "DeepSeek"),

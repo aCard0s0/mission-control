@@ -28,9 +28,19 @@ import java.util.Locale;
  *
  * <p>Deliberately not every row hermes lists. Skipped: {@code lmstudio} and
  * {@code copilot-acp}, which drive a desktop app or spawn a local binary and cannot work
- * from a container; and {@code moa}, which resolves to a named Mixture-of-Agents preset
+ * from a container; {@code moa}, which resolves to a named Mixture-of-Agents preset
  * that a freshly created profile does not have yet — picking it at create time would
- * produce an agent that cannot answer.
+ * produce an agent that cannot answer; and the browser-login OAuth rows ({@code openai-codex},
+ * {@code xai-oauth}, {@code minimax-oauth}, {@code qwen-oauth}), which need a device flow the
+ * dashboard cannot drive.
+ *
+ * <p>Hermes v0.21.0 (2026.8.31) split its {@code openai} row into {@code openai-api} (API key,
+ * api.openai.com) and {@code openai-codex} (ChatGPT subscription). The old key is gone: a
+ * profile whose {@code config.yaml} still says {@code provider: openai} passes
+ * {@code hermes status} — which only reads the env var — and then fails the runtime resolver
+ * with {@code Unknown provider 'openai'}, which the interactive CLI reports as "No inference
+ * provider is configured yet". {@link #normalizeKey} folds the old spelling to the new one, so
+ * a blueprint or credential saved before the rename keeps working.
  */
 public final class ModelProviderRegistry {
 
@@ -50,7 +60,7 @@ public final class ModelProviderRegistry {
       new Provider("openrouter", "OpenRouter", "OPENROUTER_API_KEY", false, true),
       new Provider("novita", "NovitaAI", "NOVITA_API_KEY", false, false),
       new Provider("anthropic", "Anthropic", "ANTHROPIC_API_KEY", false, true),
-      new Provider("openai", "OpenAI", "OPENAI_API_KEY", false, true),
+      new Provider("openai-api", "OpenAI API", "OPENAI_API_KEY", false, true),
       new Provider("alibaba", "Qwen Cloud", "DASHSCOPE_API_KEY", false, false),
       new Provider("xiaomi", "Xiaomi MiMo", "XIAOMI_API_KEY", false, false),
       new Provider("tencent-tokenhub", "Tencent TokenHub", "TOKENHUB_API_KEY", false, false),
@@ -83,18 +93,21 @@ public final class ModelProviderRegistry {
 
   /**
    * Collapses a provider name to the key this registry lists it under. Hermes accepts
-   * several spellings of the Nous provider ({@code nous}, {@code nous-portal}, …); every
+   * several spellings of the Nous provider ({@code nous}, {@code nous-portal}, …), and
+   * {@code openai} is what API-key OpenAI was called before hermes v0.21.0 renamed it; every
    * path that resolves an env var or writes {@code model.provider} must agree on one.
    */
   public static String normalizeKey(String provider) {
     if (provider == null) return "";
     String trimmed = provider.trim().toLowerCase(Locale.ROOT);
-    return trimmed.startsWith("nous") ? "nous" : trimmed;
+    if (trimmed.startsWith("nous")) return "nous";
+    return "openai".equals(trimmed) ? "openai-api" : trimmed;
   }
 
+  /** The row for a key in any spelling {@link #normalizeKey} accepts, or null. */
   public static Provider byKey(String key) {
     if (key == null) return null;
-    String k = key.trim().toLowerCase(Locale.ROOT);
+    String k = normalizeKey(key);
     for (Provider p : PROVIDERS) {
       if (p.key().equals(k)) return p;
     }

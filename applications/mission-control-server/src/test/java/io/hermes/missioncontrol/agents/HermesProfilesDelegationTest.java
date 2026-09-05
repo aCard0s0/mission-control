@@ -4,10 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 /**
  * The facade every agent endpoint calls, and the wiring it is responsible for.
@@ -84,6 +88,30 @@ class HermesProfilesDelegationTest {
     when(modelConfig.parseConfig(any())).thenReturn(new ConfigInfo("anthropic", "claude-opus-5", "/work"));
     when(gatewayState.read(any(), anyString(), anyString()))
         .thenReturn(new HermesGatewayState.Reading(GatewayDto.unknown(), List.of()));
+  }
+
+  // ── the writes a blueprint adds ─────────────────────────────────────────
+
+  @Test
+  void theWorkingDirGoesThroughTheModelConfigWriterUntouched() {
+    profiles.setWorkingDir(HOST, CONTAINER, PROFILE, "/work");
+
+    verify(modelConfig).writeWorkingDir(HOST, CONTAINER, PROFILE, "/work");
+  }
+
+  @Test
+  void configuringAnExistingProfileWritesTheModelThenTheKeysAndCreatesNothing() {
+    ProfileSpec spec = new ProfileSpec(CONTAINER, PROFILE, "anthropic", "claude-opus-5", "sk-ant", null, null, null);
+
+    profiles.configureModel(HOST, spec);
+
+    InOrder order = inOrder(modelConfig, env);
+    order.verify(modelConfig).write(eq(HOST), eq(CONTAINER), eq(PROFILE), eq("anthropic"), eq("claude-opus-5"),
+        isNull(), any());
+    order.verify(modelConfig).assertConfigured(HOST, CONTAINER, PROFILE);
+    order.verify(env).seedIfMissing(HOST, CONTAINER, PROFILE);
+    order.verify(modelConfig).writeApiKey(HOST, CONTAINER, PROFILE, "anthropic", "sk-ant");
+    verify(files, never()).exec(any(), anyString(), anyList());
   }
 
   // ── reading ─────────────────────────────────────────────────────────────

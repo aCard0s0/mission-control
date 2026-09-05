@@ -65,7 +65,7 @@ class HermesModelConfig {
    *  contain a slash (e.g. {@code anthropic/claude-sonnet-4}) are stored intact.
    *  Custom/local endpoints (ollama, vLLM, …) set {@code model.base_url} and own
    *  their routing, so they carry no provider; standard providers (nous,
-   *  openrouter, anthropic, openai, …) set {@code model.provider}.
+   *  openrouter, anthropic, openai-api, …) set {@code model.provider}.
    *
    *  <p>The map is first wiped to an empty scalar ({@code model: ""}) so a
    *  {@code --clone}'d profile cannot leak ANY stale key — provider, base_url, or
@@ -98,6 +98,14 @@ class HermesModelConfig {
         setConfig(host, containerId, name, kv[0], kv[1]);
       }
     });
+  }
+
+  /** {@code terminal.cwd}, through hermes' own writer like the model keys. Here rather than
+   *  beside SOUL.md because this class already reads it back ({@link ConfigInfo#cwd}), and a
+   *  key read in one place and written in another is how the two drift. */
+  void writeWorkingDir(DockerHostRef host, String containerId, String name, String cwd) {
+    if (cwd == null || cwd.isBlank()) throw new IllegalArgumentException("missing working dir");
+    files.serialized(containerId, name, () -> setConfig(host, containerId, name, "terminal.cwd", cwd.trim()));
   }
 
   /** Writes the profile's own API key, when the chosen provider takes one and the

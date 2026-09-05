@@ -1,7 +1,7 @@
 ---
 type: process
 status: verified
-verified: main @ 976a9c9 · 2026-08-28
+verified: claude/hermes-openai-api-key @ 6b6a014 · 2026-09-05
 consumes: [container, image, profile, profile-template]
 produces: [container, profile]
 ---
@@ -25,7 +25,7 @@ in it — or nothing at all.
 `HermesDeployer` is split out of `DockerGateway` because **a deploy is a multi-resource
 transaction**: a volume, one or more one-shot bootstrap containers, then the gateway itself.
 Everything after the volume creation runs inside a rollback guard, and keeping that guard
-readable is the point of the split (`docker/HermesDeployer.java:25`).
+readable is the point of the split (`docker/HermesDeployer.java:34`).
 
 The current Hermes image initializes the default profile on first boot, so readiness is *waited
 on* rather than assumed — and if readiness or named-profile creation fails, **the container and
@@ -43,14 +43,21 @@ volume are rolled back**.
    (`docker/HostAccess.java`), and always `host.docker.internal` and a 1 GB `/dev/shm`.
 5. Bounded readiness checks (`docker/DeploymentReadiness.java`), then create the requested named
    profiles.
-6. On any failure after step 2: roll back the container **and** the volume
-   (`docker/HermesDeployer.java:49`).
+6. When the request names one, apply a [template](../objects/agents/profile-template.md) to the
+   `default` profile the image just made — model settings included, through
+   `TemplateApplier.configureAndApply`. The deployer runs it as an `afterReady` step it is handed
+   by `fleet/ContainersController.java`, which is where the agents package is reachable from:
+   `docker/` must not depend on `agents/templates`, so the step crosses as a `Consumer<String>`.
+7. On any failure after step 2, step 6 included: roll back the container **and** the volume
+   (`docker/HermesDeployer.java:162`).
 
 ## If you change this
 
 - **Hits:** `ManagedContainer` labels — and therefore `ContainerUpgrader`, `ContainerLifecycle`
   and `ContainerInventory`, which all read them; `TemplateApplier` when deploying from a
-  template; `pages/agent-create-dialog.ts`, `profile-deploy-dialog.ts`.
+  template, and `HermesProfiles.configureModel` for the default profile's model settings;
+  `pages/containers.ts` (the deploy modal's blueprint select), `pages/agent-create-dialog.ts`,
+  `profile-deploy-dialog.ts`.
 - **Hits, only when asked:** host access. `HostAccess` validates ports, environment and mounts
   (the Docker socket and anything on `/opt/data` or `/opt/hermes` are refused), `HermesDeployer`
   applies them to the gateway container alone, and a writable mount widens

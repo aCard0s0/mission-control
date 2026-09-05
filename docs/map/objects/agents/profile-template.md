@@ -3,7 +3,7 @@ type: object
 cluster: agents
 universe: live
 status: verified
-verified: claude/template-model-picker @ 3a8d9db · 2026-09-05
+verified: claude/hermes-openai-api-key @ 6b6a014 · 2026-09-05
 entity: applications/mission-control-server/src/main/java/io/hermes/missioncontrol/agents/templates/
 ---
 
@@ -63,6 +63,13 @@ JSON-encoded columns: `skills` (Skills Hub ids), `library_skill_ids` (skill libr
 `guide_ids` (guide ids), `mcp_servers` (`McpServerSpec`), `secrets` (`{key, enc}`, AES-GCM
 ciphertext).
 
+`cwd` is written on deploy as `terminal.cwd` through `HermesProfiles.setWorkingDir` — the editor
+had offered a working dir since the table shipped, and nothing applied it.
+
+`provider` is stored and served through `ModelProviderRegistry.normalizeKey`, so a blueprint
+saved as `openai` before hermes renamed that key reads, deploys and re-saves as `openai-api` —
+see [provider](../models/provider-registry.md), "When hermes renames a key".
+
 ## Connected to
 
 - **owns:** its encrypted secrets and its MCP snapshot (`TemplateMcpSnapshots`,
@@ -72,7 +79,9 @@ ciphertext).
   [MCP server entry](../mcp/mcp-server-entry.md) via `mcp_servers` snapshots;
   [skill library](../dashboard/skill-library.md) rows and [guides](../dashboard/guide.md) by id
   — **not** by foreign key, for the reason the guide card gives; produces a
-  [profile](profile.md) through `TemplateApplier`
+  [profile](profile.md) through `TemplateApplier` — a new one (`deployNew`), a caller's own
+  (`layerOnto`, model left alone), or a new container's `default` (`configureAndApply`, model
+  written too, because the image made that profile with hermes' defaults and nobody else has)
 - **looks-like-but-is-not:** a profile. A template is inert until deployed.
 - **looks-like-but-is-not:** a [guide](../dashboard/guide.md). A guide is one of the things a
   template may carry, and layers onto an agent that exists; a template creates the agent.

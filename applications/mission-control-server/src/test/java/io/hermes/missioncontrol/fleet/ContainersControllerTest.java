@@ -6,7 +6,9 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -18,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.hermes.missioncontrol.docker.ContainerDto;
 import io.hermes.missioncontrol.docker.ContainerResources;
 import io.hermes.missioncontrol.docker.ContainerUpdateService;
+import io.hermes.missioncontrol.agents.templates.ProfileTemplateService;
 import io.hermes.missioncontrol.docker.DockerGateway;
 import io.hermes.missioncontrol.docker.DockerHostRef;
 import io.hermes.missioncontrol.docker.LogLineDto;
@@ -26,6 +29,7 @@ import io.hermes.missioncontrol.errors.ApiExceptionHandler;
 import io.hermes.missioncontrol.hosts.DockerHostDto;
 import io.hermes.missioncontrol.hosts.HostService;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +57,7 @@ class ContainersControllerTest {
   private DockerGateway docker;
   private HostService hosts;
   private ContainerUpdateService updates;
+  private ProfileTemplateService templates;
   private MockMvc mvc;
 
   @BeforeEach
@@ -60,8 +65,9 @@ class ContainersControllerTest {
     docker = mock(DockerGateway.class);
     hosts = mock(HostService.class);
     updates = mock(ContainerUpdateService.class);
+    templates = mock(ProfileTemplateService.class);
     mvc = MockMvcBuilders
-        .standaloneSetup(new ContainersController(docker, hosts, updates))
+        .standaloneSetup(new ContainersController(docker, hosts, updates, templates))
         .setControllerAdvice(new ApiExceptionHandler())
         .build();
   }
@@ -193,6 +199,7 @@ class ContainersControllerTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   void deployRejectsAnInvalidProfileNameAndReturnsTheNewContainerId() throws Exception {
     mvc.perform(post("/api/containers")
             .contentType(MediaType.APPLICATION_JSON)
@@ -201,7 +208,9 @@ class ContainersControllerTest {
     verifyNoInteractions(docker);
 
     when(hosts.requireConnected("dh-local")).thenReturn(HOST);
-    when(docker.deploy(HOST, "scout", "v1", List.of("default"), ContainerResources.BASELINE, HostAccess.NONE))
+    ArgumentCaptor<Consumer<String>> afterReady = ArgumentCaptor.forClass(Consumer.class);
+    when(docker.deploy(eq(HOST), eq("scout"), eq("v1"), eq(List.of("default")), eq(ContainerResources.BASELINE),
+        eq(HostAccess.NONE), afterReady.capture()))
         .thenReturn("newid123");
 
     mvc.perform(post("/api/containers")
@@ -209,6 +218,44 @@ class ContainersControllerTest {
             .content("{\"hostId\":\"dh-local\",\"name\":\"scout\",\"version\":\"v1\",\"profiles\":[\"default\"]}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value("newid123"));
+    // no blueprint named: the step the deployer runs after readiness does nothing at all
+    afterReady.getValue().accept("newid123");
+    verifyNoInteractions(templates);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void aBlueprintForTheDefaultAgentIsResolvedFirstAndAppliedOnceTheContainerIsReady() throws Exception {
+    when(hosts.requireConnected("dh-local")).thenReturn(HOST);
+    ArgumentCaptor<Consumer<String>> afterReady = ArgumentCaptor.forClass(Consumer.class);
+    when(docker.deploy(eq(HOST), eq("scout"), eq("v1"), isNull(), eq(ContainerResources.BASELINE),
+        eq(HostAccess.NONE), afterReady.capture()))
+        .thenReturn("newid123");
+
+    mvc.perform(post("/api/containers")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"hostId\":\"dh-local\",\"name\":\"scout\",\"version\":\"v1\",\"defaultTemplateId\":\" pt-1 \"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value("newid123"));
+
+    // resolved before the deploy, so an unknown id never costs a volume
+    verify(templates).get("pt-1");
+    verify(templates, never()).applyToDefault(anyString(), any(), anyString());
+    // and the step the deployer runs after readiness is the apply, onto the new container
+    afterReady.getValue().accept("newid123");
+    verify(templates).applyToDefault("pt-1", HOST, "newid123");
+  }
+
+  @Test
+  void anUnknownBlueprintIs404BeforeAnythingIsCreated() throws Exception {
+    when(hosts.requireConnected("dh-local")).thenReturn(HOST);
+    when(templates.get("pt-gone")).thenThrow(new NoSuchElementException("unknown template: pt-gone"));
+
+    mvc.perform(post("/api/containers")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"hostId\":\"dh-local\",\"name\":\"scout\",\"defaultTemplateId\":\"pt-gone\"}"))
+        .andExpect(status().isNotFound());
+    verifyNoInteractions(docker);
   }
 
   @Test

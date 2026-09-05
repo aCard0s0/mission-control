@@ -41,7 +41,7 @@ class ModelCatalogServiceTest {
   @Test
   void anthropicAndOpenaiStillResolve() {
     assertEquals(List.of("claude-fable-5", "claude-opus-4-8"), service.configured("anthropic").models());
-    assertEquals(List.of("gpt-5.2", "gpt-5.2-mini"), service.configured("openai").models());
+    assertEquals(List.of("gpt-5.2", "gpt-5.2-mini"), service.configured("openai-api").models());
   }
 
   @Test

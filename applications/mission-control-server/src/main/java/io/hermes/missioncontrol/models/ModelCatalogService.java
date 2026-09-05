@@ -129,7 +129,7 @@ public class ModelCatalogService {
   private List<String> configuredModels(String provider) {
     String csv = switch (provider) {
       case "anthropic" -> props.anthropic();
-      case "openai" -> props.openai();
+      case "openai-api" -> props.openai();
       case "nous" -> props.nous();
       case "openrouter" -> props.openrouter();
       case "nvidia" -> props.nvidia();
@@ -157,7 +157,7 @@ public class ModelCatalogService {
   private List<String> fetch(String provider, String apiKey) throws Exception {
     return switch (provider) {
       case "anthropic" -> fetchAnthropic(apiKey);
-      case "openai" -> fetchOpenai(apiKey);
+      case "openai-api" -> fetchOpenai(apiKey);
       case "openrouter" -> fetchOpenrouter(apiKey);
       case "nvidia" -> fetchKeyless("https://integrate.api.nvidia.com/v1/models");
       // Nous is an OAuth account for *inference*, which is why nothing here holds a key for
@@ -238,7 +238,9 @@ public class ModelCatalogService {
     return OPENAI_EXCLUDED.stream().noneMatch(lower::contains);
   }
 
+  /** The registry's spelling, so a catalog asked for under a key hermes has since renamed
+   *  (`openai`, now `openai-api`) still answers, and answers under the current key. */
   private String normalize(String provider) {
-    return provider == null ? "" : provider.trim().toLowerCase(Locale.ROOT);
+    return io.hermes.missioncontrol.agents.ModelProviderRegistry.normalizeKey(provider);
   }
 }

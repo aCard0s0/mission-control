@@ -3,14 +3,16 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DockerHost, HermesContainer, ImageCatalog, ImageTag } from '../core/models';
+import {
+  DockerHost, HermesContainer, ImageCatalog, ImageTag, ProfileTemplate,
+} from '../core/models';
 import { HERMES_BASELINE } from '../core/container-resources';
 import { NO_HOST_ACCESS } from '../core/host-access';
 import { ContainersPage, normalizeSeedProfiles } from './containers';
 import {
   TestFixture, button, buttonWith, choose, el, field, fill, press, settle, stubConfirm, text, type,
 } from '../testing/dom';
-import { container, dockerHost } from '../testing/models';
+import { container, dockerHost, template as buildTemplate } from '../testing/models';
 import { ApiContainerActivity } from '../core/hermes-api';
 import { provideStores } from '../testing/store';
 
@@ -67,6 +69,7 @@ const storeStub = (containers: HermesContainer[], catalogs: Record<string, Image
       remove: vi.fn().mockResolvedValue(true),
     },
     terminal: { open: vi.fn() },
+    templates: { templates: signal<ProfileTemplate[]>([]) },
   };
 };
 
@@ -353,9 +356,44 @@ describe('ContainersPage deploy', () => {
     await settle(fixture);
 
     expect(store.lifecycle.deploy).toHaveBeenCalledWith(
-      'hermes-staging', 'latest', ['ops', 'research-team'], 'dh-local', HERMES_BASELINE, NO_HOST_ACCESS);
+      'hermes-staging', 'latest', ['ops', 'research-team'], 'dh-local', HERMES_BASELINE, NO_HOST_ACCESS, null);
     expect(store.containers.select).toHaveBeenCalledWith('c-new');
     expect(el(fixture).querySelector('.modal')).toBeNull();
+  });
+
+  it('offers the blueprints for the default agent and sends the chosen one', async () => {
+    const store = storeStub([]);
+    store.templates.templates.set([
+      buildTemplate('pt-coach', { name: 'coach', provider: 'openai-api', model: 'gpt-5.2' }),
+    ]);
+    const { fixture } = render(store);
+    await openDeploy(fixture);
+    await fill(fixture, 'container name', 'hermes-staging');
+
+    const options = Array.from(field(fixture, 'default agent').querySelectorAll('option')).map(o => o.textContent?.trim());
+    expect(options[0]).toContain('hermes defaults');
+    expect(options[1]).toBe('coach · openai-api / gpt-5.2');
+
+    await choose(fixture, 'default agent', 'pt-coach');
+    press(fixture, 'deploy');
+    await settle(fixture);
+
+    expect(store.lifecycle.deploy).toHaveBeenCalledWith(
+      'hermes-staging', 'latest', [], 'dh-local', HERMES_BASELINE, NO_HOST_ACCESS, 'pt-coach');
+  });
+
+  it('forgets the last blueprint when the modal is opened again', async () => {
+    const store = storeStub([]);
+    store.templates.templates.set([buildTemplate('pt-coach', { name: 'coach' })]);
+    const { fixture } = render(store);
+    await openDeploy(fixture);
+    await choose(fixture, 'default agent', 'pt-coach');
+    el(fixture).querySelector<HTMLButtonElement>('.modal-actions .btn.ghost')!.click();
+    fixture.detectChanges();
+
+    await openDeploy(fixture);
+
+    expect(field(fixture, 'default agent').querySelector<HTMLSelectElement>('select')!.value).toBe('');
   });
 
   it('keeps the modal open, with the name intact, when the deploy fails', async () => {
@@ -915,7 +953,7 @@ describe('ContainersPage deploy resources', () => {
           { key: 'HERMES_DASHBOARD_BASIC_AUTH_PASSWORD', value: expect.stringMatching(/^[0-9a-f]{32}$/) },
         ]),
         mounts: [],
-      }));
+      }), null);
   });
 
   it('a half-filled row is dropped rather than sent', async () => {
@@ -930,7 +968,7 @@ describe('ContainersPage deploy resources', () => {
     await settle(fixture);
 
     expect(store.lifecycle.deploy).toHaveBeenCalledWith(
-      'hermes-staging', 'latest', [], 'dh-local', HERMES_BASELINE, NO_HOST_ACCESS);
+      'hermes-staging', 'latest', [], 'dh-local', HERMES_BASELINE, NO_HOST_ACCESS, null);
   });
 
   it('deploys the raised ceiling rather than the baseline', async () => {
@@ -945,7 +983,7 @@ describe('ContainersPage deploy resources', () => {
     await settle(fixture);
 
     expect(store.lifecycle.deploy).toHaveBeenCalledWith(
-      'hermes-staging', 'latest', [], 'dh-local', { memoryMb: 8192, cpus: 4 }, NO_HOST_ACCESS);
+      'hermes-staging', 'latest', [], 'dh-local', { memoryMb: 8192, cpus: 4 }, NO_HOST_ACCESS, null);
   });
 
   it('warns at the floor that browser automation will not fit', async () => {

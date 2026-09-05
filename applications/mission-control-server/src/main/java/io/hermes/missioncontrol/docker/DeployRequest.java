@@ -19,6 +19,10 @@ import jakarta.validation.Valid;
  *     below by the vendor's stated minimum rather than by Docker's, so a deploy cannot
  *     quietly produce an agent the vendor documents as too small to run.
  * @param cpus CPU ceiling in cores, fractions allowed; null takes the baseline.
+ * @param defaultTemplateId a profile template to apply to the {@code default} profile once the
+ *     gateway is ready — its model settings, key, soul, memory, skills, MCP servers and guides.
+ *     Null leaves the default agent as the image initializes it. Resolved by the controller,
+ *     which is where the agents package is reachable from; this package only carries the id.
  */
 public record DeployRequest(
     @NotBlank String hostId,
@@ -34,7 +38,21 @@ public record DeployRequest(
     @DecimalMin("1.0") @DecimalMax("64.0") Double cpus,
     @Valid @Size(max = 32) List<HostAccess.PortMapping> ports,
     @Valid @Size(max = 64) List<HostAccess.EnvVar> env,
-    @Valid @Size(max = 16) List<HostAccess.Mount> mounts) {
+    @Valid @Size(max = 16) List<HostAccess.Mount> mounts,
+    @Size(max = 64) String defaultTemplateId) {
+
+  /** A deploy that leaves the default agent as the image makes it. */
+  public DeployRequest(
+      String hostId, String name, String version, List<String> profiles, Integer memoryMb,
+      Double cpus, List<HostAccess.PortMapping> ports, List<HostAccess.EnvVar> env,
+      List<HostAccess.Mount> mounts) {
+    this(hostId, name, version, profiles, memoryMb, cpus, ports, env, mounts, null);
+  }
+
+  /** True when a blueprint is to be applied to the default agent. */
+  public boolean hasDefaultTemplate() {
+    return defaultTemplateId != null && !defaultTemplateId.isBlank();
+  }
 
   /**
    * What the operator asked to open to the host. The path rules are checked here rather than

@@ -3,6 +3,14 @@
  * composes a path and hands it to {@link ApiHttp.req} — so timeouts, the JSON
  * content type, error-body unwrapping and the empty-body case are decided once.
  */
+/**
+ * The budget for a one-shot write that runs hermes inside a container many times over — a
+ * profile create is some thirty `hermes config set` invocations at half a second each before
+ * a blueprint's own files, skills and keys are written. The 15 s default is sized for polls,
+ * and a deploy that outlived it was reported as a timeout while it went on to finish.
+ */
+export const CONTAINER_WRITE_TIMEOUT_MS = 120_000;
+
 export class ApiHttp {
   private readonly base: string;
 

@@ -23,7 +23,7 @@ class ModelProviderRegistryTest {
 
   /** Mirrors ModelCatalogService's provider switch — the set it can serve a catalog for. */
   private static final Set<String> PROVIDERS_WITH_A_CURATED_CATALOG =
-      Set.of("anthropic", "openai", "nous", "openrouter", "nvidia");
+      Set.of("anthropic", "openai-api", "nous", "openrouter", "nvidia");
 
   @Test
   void everyProviderKeyIsUniqueAndLowercase() {
@@ -70,6 +70,19 @@ class ModelProviderRegistryTest {
     // an OAuth provider resolves but has no env var
     assertNotNull(ModelProviderRegistry.byKey("nous"));
     assertNull(ModelProviderRegistry.envVar("nous"));
+  }
+
+  @Test
+  void theSpellingHermesRetiredForOpenAiStillResolvesToItsRow() {
+    // hermes v0.21.0 split `openai` into openai-api (API key) and openai-codex (ChatGPT login);
+    // the runtime resolver refuses the old key, so anything stored under it has to be folded
+    assertEquals("openai-api", ModelProviderRegistry.normalizeKey("openai"));
+    assertEquals("openai-api", ModelProviderRegistry.normalizeKey(" OpenAI "));
+    assertEquals("openai-api", ModelProviderRegistry.byKey("openai").key());
+    assertEquals("OPENAI_API_KEY", ModelProviderRegistry.envVar("openai"));
+    assertNull(ModelProviderRegistry.byKey("openai-codex"), "a browser-login row is not offered");
+    // and the Nous spellings collapse the same way through byKey
+    assertEquals("nous", ModelProviderRegistry.byKey("nous-portal").key());
   }
 
   @Test

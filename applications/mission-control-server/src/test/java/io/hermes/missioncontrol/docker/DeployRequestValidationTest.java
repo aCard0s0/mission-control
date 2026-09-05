@@ -24,6 +24,23 @@ class DeployRequestValidationTest {
   }
 
   @Test
+  void aDefaultTemplateIdIsBoundedAndAbsentByDefault() {
+    try (var factory = Validation.buildDefaultValidatorFactory()) {
+      var validator = factory.getValidator();
+      var bare = new DeployRequest("dh-local", "demo", "latest", List.of(), null, null, null, null, null);
+      assertFalse(bare.hasDefaultTemplate());
+      assertFalse(new DeployRequest(
+          "dh-local", "demo", "latest", List.of(), null, null, null, null, null, "   ").hasDefaultTemplate());
+      var withBlueprint = new DeployRequest(
+          "dh-local", "demo", "latest", List.of(), null, null, null, null, null, "pt-1");
+      assertTrue(withBlueprint.hasDefaultTemplate());
+      assertTrue(validator.validate(withBlueprint).isEmpty());
+      assertFalse(validator.validate(new DeployRequest(
+          "dh-local", "demo", "latest", List.of(), null, null, null, null, null, "x".repeat(65))).isEmpty());
+    }
+  }
+
+  @Test
   void aDeployTagIsValidatedTheSameWayAnUpdateTagIs() {
     // the same value reaches the same daemon as an update tag; unconstrained, a typo was
     // only caught by the daemon — after the managed volume had already been created

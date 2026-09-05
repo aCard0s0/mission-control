@@ -47,7 +47,7 @@ describe('ContainerLifecycle deploy', () => {
       await deployed;
 
       // a caller that says nothing about size gets the recommendation, never no limit
-      expect(deploy).toHaveBeenCalledWith('dh-local', 'hermes-lab', 'v1', [], HERMES_BASELINE, NO_HOST_ACCESS);
+      expect(deploy).toHaveBeenCalledWith('dh-local', 'hermes-lab', 'v1', [], HERMES_BASELINE, NO_HOST_ACCESS, null);
     });
 
   it('sends a raised ceiling through to the backend', async () => {
@@ -59,7 +59,7 @@ describe('ContainerLifecycle deploy', () => {
     await deployed;
 
     expect(deploy).toHaveBeenCalledWith(
-      'dh-local', 'hermes-lab', 'v1', [], { memoryMb: 8192, cpus: 4 }, NO_HOST_ACCESS);
+      'dh-local', 'hermes-lab', 'v1', [], { memoryMb: 8192, cpus: 4 }, NO_HOST_ACCESS, null);
   });
 
   it('answers an empty id and says why a deploy failed', async () => {

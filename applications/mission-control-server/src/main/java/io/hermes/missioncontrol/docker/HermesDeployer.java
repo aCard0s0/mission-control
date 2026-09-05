@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -49,9 +50,25 @@ public class HermesDeployer {
     this.readiness = readiness;
   }
 
+  /** A deploy with nothing to do after the gateway is ready. */
   public String deploy(
       DockerHostRef host, String name, String version, List<String> profiles,
       ContainerResources resources, HostAccess access) {
+    return deploy(host, name, version, profiles, resources, access, containerId -> { });
+  }
+
+  /**
+   * @param afterReady runs with the new container's id once readiness has passed and before
+   *     the deploy is reported — the seam through which a blueprint reaches the {@code default}
+   *     profile, which the image itself creates. It runs inside the rollback guard: a blueprint
+   *     that fails takes the container and its volume with it, the same as a seed profile that
+   *     fails, rather than leaving an agent that is half of what was asked for. A
+   *     {@code Consumer} rather than a reference to the agents package, because that dependency
+   *     already points the other way.
+   */
+  public String deploy(
+      DockerHostRef host, String name, String version, List<String> profiles,
+      ContainerResources resources, HostAccess access, Consumer<String> afterReady) {
     DockerClient client = clients.forUrl(host.url());
     String tag = ImageStore.tagOf(version);
     String image = images.reference(tag);
@@ -128,6 +145,7 @@ public class HermesDeployer {
       containerId = created.getId();
       client.startContainerCmd(containerId).exec();
       readiness.validate(host, client, containerId, seedProfiles);
+      afterReady.accept(containerId);
       log.info("deployed {} from {} on {} — container {}, volume {}, seed profiles {}, {} MB / {} cpus, "
               + "{} published port(s), {} mount(s)",
           name, image, host.id(), shortId(containerId), volumeName,

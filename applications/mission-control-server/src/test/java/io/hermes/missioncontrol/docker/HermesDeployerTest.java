@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -36,6 +37,7 @@ import io.hermes.missioncontrol.config.AppProperties;
 import io.hermes.missioncontrol.errors.UpstreamUnavailableException;
 import java.time.Duration;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
@@ -290,6 +292,66 @@ class HermesDeployerTest {
     verify(pull).withTag("latest");
     verify(pull).exec(any(PullImageResultCallback.class));
     verify(main, times(2)).exec();
+  }
+
+  @Test
+  void theAfterReadyStepRunsWithTheNewIdOnceReadinessHasPassed() {
+    // the seam a blueprint for the default profile comes through: after readiness, so the
+    // profile exists and the gateway is up, and before the deploy is reported as done
+    stubMissingVolume("mc-hermes-demo");
+    stubCreateVolume();
+    CreateContainerCmd init = mock(CreateContainerCmd.class, Answers.RETURNS_SELF);
+    CreateContainerCmd main = mock(CreateContainerCmd.class, Answers.RETURNS_SELF);
+    CreateContainerResponse initCreated = createdWithId("init-id");
+    CreateContainerResponse mainCreated = createdWithId("main-id");
+    when(client.createContainerCmd("hermes/image:latest")).thenReturn(init, main);
+    when(init.exec()).thenReturn(initCreated);
+    when(main.exec()).thenReturn(mainCreated);
+    stubOneShot("init-id", 0);
+    stubStart("main-id");
+    ContainerState state = stubState("main-id");
+    when(state.getRunning()).thenReturn(true);
+    List<String> handed = new ArrayList<>();
+
+    String containerId = subject.deploy(HOST, "demo", "latest", List.of(), ContainerResources.BASELINE,
+        HostAccess.NONE, id -> {
+          handed.add(id);
+          // readiness has run by now: the exec seam has been asked for the gateway's status
+          verify(dockerExec, atLeastOnce()).runAsUser(any(), eq("main-id"), any(), any(), anyString(),
+              anyBoolean(), anyBoolean(), any(Duration.class));
+        });
+
+    assertEquals("main-id", containerId);
+    assertEquals(List.of("main-id"), handed);
+  }
+
+  @Test
+  void anAfterReadyStepThatFailsRollsBackTheContainerAndVolume() {
+    // a blueprint that fails on the default profile leaves an agent that is half of what was
+    // asked for, so it costs the deploy the same as a seed profile that fails
+    stubMissingVolume("mc-hermes-demo");
+    stubCreateVolume();
+    CreateContainerCmd init = mock(CreateContainerCmd.class, Answers.RETURNS_SELF);
+    CreateContainerCmd main = mock(CreateContainerCmd.class, Answers.RETURNS_SELF);
+    CreateContainerResponse initCreated = createdWithId("init-id");
+    CreateContainerResponse mainCreated = createdWithId("main-id");
+    when(client.createContainerCmd("hermes/image:latest")).thenReturn(init, main);
+    when(init.exec()).thenReturn(initCreated);
+    when(main.exec()).thenReturn(mainCreated);
+    stubOneShot("init-id", 0);
+    stubStart("main-id");
+    ContainerState state = stubState("main-id");
+    when(state.getRunning()).thenReturn(true);
+    RemoveContainerCmd removeMain = stubRemoveContainer("main-id");
+    RemoveVolumeCmd removeVolume = stubRemoveVolume("mc-hermes-demo");
+
+    IllegalStateException failure = assertThrows(IllegalStateException.class,
+        () -> subject.deploy(HOST, "demo", "latest", List.of(), ContainerResources.BASELINE, HostAccess.NONE,
+            id -> { throw new IllegalStateException("blueprint failed on default"); }));
+
+    assertEquals("blueprint failed on default", failure.getMessage());
+    verify(removeMain).exec();
+    verify(removeVolume).exec();
   }
 
   @Test

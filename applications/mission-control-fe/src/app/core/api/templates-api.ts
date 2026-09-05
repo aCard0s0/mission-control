@@ -2,7 +2,7 @@ import { ProfileTemplateInput } from '../models';
 import { ApiAgentProfile, ApiProfileTemplate } from './api-types';
 import { AgentRef } from './agent-ref';
 import { CrudApi } from './crud-api';
-import { ApiHttp, seg } from './http';
+import { ApiHttp, CONTAINER_WRITE_TIMEOUT_MS, seg } from './http';
 
 /** `/api/profile-templates` — reusable agent blueprints, plus the capture and
  *  deploy calls that move configuration between a template and a live profile.
@@ -18,13 +18,13 @@ export class TemplatesApi extends CrudApi<ApiProfileTemplate, ProfileTemplateInp
   capture(ref: AgentRef, templateName?: string): Promise<ApiProfileTemplate> {
     return this.http.post('/api/profile-templates/capture', {
       hostId: ref.hostId, containerId: ref.containerId, name: ref.name, templateName,
-    });
+    }, CONTAINER_WRITE_TIMEOUT_MS);
   }
 
   /** Materializes a template into `ref`'s container as the profile `ref.name`. */
   deploy(id: string, ref: AgentRef): Promise<ApiAgentProfile> {
     return this.http.post(`/api/profile-templates/${seg(id)}/deploy`, {
       hostId: ref.hostId, containerId: ref.containerId, name: ref.name,
-    });
+    }, CONTAINER_WRITE_TIMEOUT_MS);
   }
 }

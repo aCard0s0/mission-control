@@ -1,6 +1,7 @@
 package io.hermes.missioncontrol.fleet;
 
 import io.hermes.missioncontrol.docker.ContainerDto;
+import io.hermes.missioncontrol.agents.templates.ProfileTemplateService;
 import io.hermes.missioncontrol.docker.ContainerUpdateService;
 import io.hermes.missioncontrol.docker.DeployRequest;
 import io.hermes.missioncontrol.docker.DockerGateway;
@@ -13,6 +14,7 @@ import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -33,12 +35,15 @@ public class ContainersController {
   private final DockerGateway docker;
   private final HostService hosts;
   private final ContainerUpdateService updates;
+  private final ProfileTemplateService templates;
 
   public ContainersController(
-      DockerGateway docker, HostService hosts, ContainerUpdateService updates) {
+      DockerGateway docker, HostService hosts, ContainerUpdateService updates,
+      ProfileTemplateService templates) {
     this.docker = docker;
     this.hosts = hosts;
     this.updates = updates;
+    this.templates = templates;
   }
 
   /**
@@ -116,12 +121,24 @@ public class ContainersController {
     return docker.logs(hosts.requireConnected(hostId), id, tail, since);
   }
 
+  /**
+   * The blueprint for the default agent, when one is named, goes on after the gateway is ready
+   * and inside the deployer's rollback guard. It is resolved here first, so an id that names
+   * nothing answers 404 before a volume exists rather than after a container has been pulled,
+   * created and rolled back for it.
+   */
   @PostMapping
   public Map<String, String> deploy(@Valid @RequestBody DeployRequest request) {
+    DockerHostRef host = hosts.requireConnected(request.hostId());
+    Consumer<String> afterReady = containerId -> { };
+    if (request.hasDefaultTemplate()) {
+      String templateId = request.defaultTemplateId().trim();
+      templates.get(templateId);
+      afterReady = containerId -> templates.applyToDefault(templateId, host, containerId);
+    }
     String containerId = docker.deploy(
-        hosts.requireConnected(request.hostId()),
-        request.name(), request.version(), request.profiles(), request.resources(),
-        request.hostAccess());
+        host, request.name(), request.version(), request.profiles(), request.resources(),
+        request.hostAccess(), afterReady);
     return Map.of("id", containerId);
   }
 

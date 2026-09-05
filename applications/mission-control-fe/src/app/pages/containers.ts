@@ -9,6 +9,7 @@ import { HostStore } from '../core/store/host-store';
 import { ImageCatalogStore } from '../core/store/image-catalog-store';
 import { StoreContext } from '../core/store/store-context';
 import { TerminalRequestStore } from '../core/store/terminal-request-store';
+import { TemplateStore } from '../core/store/template-store';
 import { StatusDot } from '../shared/status-dot';
 import { Sparkline } from '../shared/sparkline';
 import { Reveal } from '../shared/reveal';
@@ -50,6 +51,7 @@ export class ContainersPage {
   protected readonly images = inject(ImageCatalogStore);
   protected readonly lifecycle = inject(ContainerLifecycle);
   protected readonly terminal = inject(TerminalRequestStore);
+  protected readonly templates = inject(TemplateStore);
   private readonly router = inject(Router);
 
   protected readonly uptime = uptime;
@@ -59,6 +61,8 @@ export class ContainersPage {
   protected deployName = '';
   protected deployVersion = '';
   protected deployProfiles = '';
+  /** A blueprint for the default agent the image creates, or '' for hermes' own defaults. */
+  protected deployTemplateId = '';
   protected deployHost = 'dh-local';
   protected readonly deployTags = signal<string[]>([]);
   protected readonly tagsLoading = signal(false);
@@ -257,6 +261,7 @@ export class ContainersPage {
     this.deployMemoryMb.set(HERMES_BASELINE.memoryMb);
     this.deployCpus.set(HERMES_BASELINE.cpus);
     this.deployAccess = emptyAccess();
+    this.deployTemplateId = '';
     this.deployHost = this.connectedHosts()[0]?.id ?? '';
     this.deployTags.set([]);
     this.tagsError.set(null);
@@ -288,7 +293,8 @@ export class ContainersPage {
     this.deployBusy.set(true);
     this.deployFailed.set(false);
     const id = await this.lifecycle.deploy(name, this.deployVersion, profiles, this.deployHost,
-      { memoryMb: this.deployMemoryMb(), cpus: this.deployCpus() }, compactAccess(this.deployAccess));
+      { memoryMb: this.deployMemoryMb(), cpus: this.deployCpus() }, compactAccess(this.deployAccess),
+      this.deployTemplateId || null);
     this.deployBusy.set(false);
     if (!id) {
       this.deployFailed.set(true);

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -162,7 +163,7 @@ class ProfileTemplateServiceTest {
 
   @Test
   void createFromTemplateRollsBackProfileWhenBlueprintFails() {
-    HermesProfiles profiles = Mockito.mock(HermesProfiles.class);
+    HermesProfiles profiles = TemplatesWiring.profilesMock();
     HermesSetup setup = Mockito.mock(HermesSetup.class);
     ProfileTemplateService ownedService =
         TemplatesWiring.service(repository, cipher, profiles, setup);
@@ -180,6 +181,28 @@ class ProfileTemplateServiceTest {
 
     verify(profiles).createProfileBare(HOST, create);
     verify(profiles).delete(HOST, "cid", "ops");
+    // and the profile stayed inside the creating window while the blueprint was layered on
+    verify(profiles).whileCreating(eq("cid"), eq("ops"), any());
+  }
+
+  @Test
+  void aProviderIsStoredAndServedUnderTheRegistrysCurrentKey() {
+    // hermes v0.21.0 renamed API-key OpenAI to openai-api; a blueprint saved as `openai` before
+    // that has to deploy under a name hermes still resolves, and pick the right editor option
+    when(repository.existsByName(any())).thenReturn(false);
+    ProfileTemplate legacy = new ProfileTemplate(
+        "pt-1", "ops", "", "", "ops", "openai", "gpt-5.2", "", "", "", "",
+        List.of(), List.of(), List.of(), 1L, 1L);
+    when(repository.findById("pt-1")).thenReturn(Optional.of(legacy));
+
+    assertEquals("openai-api", service.get("pt-1").provider());
+
+    service.create(new UpsertProfileTemplateRequest(
+        "sre", "", "desc", "ops", "OpenAI", "gpt-5.2", "", "/opt/data", "", "",
+        List.of(), List.of(), List.of(), List.of(), List.of()));
+    ArgumentCaptor<ProfileTemplate> written = ArgumentCaptor.forClass(ProfileTemplate.class);
+    verify(repository).insert(written.capture());
+    assertEquals("openai-api", written.getValue().provider());
   }
 
   @Test

@@ -94,7 +94,7 @@ class ModelCatalogLiveTest {
         ]}
         """);
 
-    List<String> models = service.live("openai", "sk-openai-key").models();
+    List<String> models = service.live("openai-api", "sk-openai-key").models();
 
     assertEquals(Optional.of("Bearer sk-openai-key"),
         sent.getFirst().headers().firstValue("Authorization"));
@@ -173,8 +173,8 @@ class ModelCatalogLiveTest {
   void anUnparseableBodyFallsBackRatherThanPropagating() {
     ModelCatalogService service = serviceAnswering(request -> "<html>gateway timeout</html>");
 
-    assertEquals("config", service.live("openai", "sk-openai-key").source());
-    assertEquals(List.of("gpt-5.2", "gpt-5.2-mini"), service.live("openai", "k").models());
+    assertEquals("config", service.live("openai-api", "sk-openai-key").source());
+    assertEquals(List.of("gpt-5.2", "gpt-5.2-mini"), service.live("openai-api", "k").models());
   }
 
   @Test

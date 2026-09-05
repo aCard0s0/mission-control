@@ -134,7 +134,7 @@ is refused with **nothing** written — not even the valid `SKILL.md` earlier in
 
 - **Hits:** `SkillRepository`, `SkillController`, `common/Text.java:38` (the `repoUrl` rule, shared
   with the MCP catalog — a change there hits both stores), `HermesProfiles.installSkillFiles`
-  (`agents/HermesProfiles.java:313`), `HermesSkills.writeSkillFiles`/`readSkillFiles`,
+  (`agents/HermesProfiles.java:354`), `HermesSkills.writeSkillFiles`/`readSkillFiles`,
   `ProfilePaths.skillFile`, `pages/skills.ts`, `pages/skill-deploy-dialog.ts`,
   `core/store/skill-store.ts`, and the `save to library` button on
   `pages/agent-skills-panel.html`.

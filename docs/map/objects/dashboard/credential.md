@@ -82,7 +82,7 @@ Citations: `applications/mission-control-server/src/main/resources/schema.sql:31
   request fields above, each with its own resolution point:
   `agents/web/AgentSetupController.java:80` (`.env` writes),
   `agents/web/AgentsController.java:95` (create-agent, resolved against
-  `ModelProviderRegistry.envVar`), and `agents/templates/ProfileTemplateService.java:229`
+  `ModelProviderRegistry.envVar`), and `agents/templates/ProfileTemplateService.java:247`
   (blueprint, ciphertext to ciphertext).
 - **Hits:** the [API contract](api-contract.md) — four routes, so `api-contract.txt`,
   `docs/api.md` and `ApiContractTest.CONTRACT` all move.

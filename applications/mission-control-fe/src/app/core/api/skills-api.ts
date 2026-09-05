@@ -2,7 +2,7 @@ import { AgentRef, agentTarget } from './agent-ref';
 import { SkillInput } from '../models';
 import { ApiImportedSkill, ApiSkill, ApiAgentProfile, ApiUpstream } from './api-types';
 import { CrudApi } from './crud-api';
-import { ApiHttp, seg } from './http';
+import { ApiHttp, CONTAINER_WRITE_TIMEOUT_MS, seg } from './http';
 
 /**
  * `/api/skills` — the skill *library*: dashboard-owned rows, global rather than scoped
@@ -19,7 +19,7 @@ export class SkillsApi extends CrudApi<ApiSkill, SkillInput> {
   /** Puts the skill on one agent. A hub row installs through hermes; a local one has its
    *  files written out. Answers with the refreshed profile, like every agent mutation. */
   deploy(id: string, agent: AgentRef): Promise<ApiAgentProfile> {
-    return this.http.post(`/api/skills/${seg(id)}/deploy`, agentTarget(agent));
+    return this.http.post(`/api/skills/${seg(id)}/deploy`, agentTarget(agent), CONTAINER_WRITE_TIMEOUT_MS);
   }
 
   /** Whether the skill's source repository has moved on. Reaches the network, so it is a
@@ -30,6 +30,6 @@ export class SkillsApi extends CrudApi<ApiSkill, SkillInput> {
 
   /** Copies a skill off an agent into the library. */
   importFrom(agent: AgentRef, skillName: string): Promise<ApiImportedSkill> {
-    return this.http.post('/api/skills/import', { ...agentTarget(agent), skillName });
+    return this.http.post('/api/skills/import', { ...agentTarget(agent), skillName }, CONTAINER_WRITE_TIMEOUT_MS);
   }
 }

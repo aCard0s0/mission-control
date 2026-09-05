@@ -51,6 +51,15 @@ class HermesModelConfigTest {
   }
 
   @Test
+  void theRetiredOpenAiSpellingIsWrittenAsTheKeyHermesResolves() {
+    // `provider: openai` passed `hermes status` (it only reads the env var) and failed the
+    // runtime resolver with "Unknown provider 'openai'" — the agent then asked to be set up
+    Map<String, String> e = entries("openai", "gpt-5.2", null);
+    assertEquals("openai-api", e.get("model.provider"));
+    assertEquals("openai-api", auxEntries("openai", "gpt-5.2", null).get("auxiliary.compression.provider"));
+  }
+
+  @Test
   void openrouterModelIdKeptVerbatimNotConcatenated() {
     Map<String, String> e = entries("openrouter", "anthropic/claude-sonnet-4", null);
     // the slashed id is written as-is to model.default — never provider/model

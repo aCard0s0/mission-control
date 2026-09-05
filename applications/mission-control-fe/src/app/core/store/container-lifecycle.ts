@@ -25,11 +25,12 @@ export class ContainerLifecycle {
     name: string, version: string, profileNames: string[], hostId = 'dh-local',
     resources: ContainerResources = HERMES_BASELINE,
     access: HostAccess = NO_HOST_ACCESS,
+    defaultTemplateId: string | null = null,
   ): Promise<string> {
     return this.activity.run(`deploying ${name}`, async () => {
       try {
         const r = await this.ctx.api.containers.deploy(
-          hostId, name, version, profileNames, resources, access);
+          hostId, name, version, profileNames, resources, access, defaultTemplateId);
         await new Promise(resolve => setTimeout(resolve, 600));
         await this.containers.refresh();
         this.containers.select(r.id);

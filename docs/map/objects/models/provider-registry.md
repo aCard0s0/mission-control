@@ -3,7 +3,7 @@ type: object
 cluster: models
 universe: live
 status: verified
-verified: main @ 976a9c9 · 2026-08-28
+verified: claude/hermes-openai-api-key @ e4e23e4 · 2026-09-05
 entity: applications/mission-control-server/src/main/java/io/hermes/missioncontrol/agents/ModelProviderRegistry.java
 ---
 
@@ -24,10 +24,30 @@ The one job the registry does that no caller could do alone: the picker, the "ne
 key?" rule, and the provider→catalog decision all read the same list, so they cannot disagree
 (`agents/web/ProvidersController.java:9`).
 
+## When hermes renames a key
+
+A mirror drifts when the original moves. Hermes v0.21.0 (2026.8.31) split `openai` into
+`openai-api` (API key, api.openai.com) and `openai-codex` (ChatGPT subscription) and dropped
+the old key. The failure that produced is quiet: a profile whose `config.yaml` says
+`provider: openai` passes `hermes status`, which only reads the env var and prints
+`OpenAI ✓`, and then fails hermes' runtime resolver with `Unknown provider 'openai'` — which
+the interactive CLI reports as "No inference provider is configured yet — let's fix that".
+
+So the row is `openai-api`, and `normalizeKey` (`agents/ModelProviderRegistry.java:100`) folds
+the retired spelling to it. Every path that writes `model.provider` or resolves an env var
+already goes through that method, and `byKey` does now too, so a blueprint or a live profile
+saved under the old key deploys, is served and masks its key under the new one. The
+[profile template](../agents/profile-template.md) also normalizes `provider` on save and on
+the wire, so a re-save stores the current key for good.
+
+The cheap check when hermes moves again: `hermes -p <name> status` is not it. Run hermes' own
+resolver — `resolve_runtime_provider(requested=<key>)` from `hermes_cli.runtime_provider`, with
+the profile's `.env` exported — and compare `CANONICAL_PROVIDERS` slugs against `PROVIDERS`.
+
 ## Shape
 
-`Provider(key, label, envVar, oauth, hasCatalog)` — `agents/ModelProviderRegistry.java:37`.
-~28 entries, `agents/ModelProviderRegistry.java:47`.
+`Provider(key, label, envVar, oauth, hasCatalog)` — `agents/ModelProviderRegistry.java:47`.
+~28 entries, `agents/ModelProviderRegistry.java:57`.
 
 - `envVar` null means the provider takes no key (OAuth or resolved elsewhere).
 - `hasCatalog` gates whether [Model catalog](model-catalog.md) can list names for it.

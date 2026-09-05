@@ -30,15 +30,22 @@ export class ContainersApi {
     return this.http.get(`/api/containers/${seg(hostId)}/${seg(id)}/logs?tail=${tail}${cursor}`);
   }
 
+  /**
+   * `defaultTemplateId` names a blueprint for the `default` agent the image creates; null
+   * leaves it as hermes makes it. Allowed the same budget as an update: a cold host pulls the
+   * image, the gateway has to pass readiness, and a blueprint is some forty hermes calls more.
+   */
   deploy(
     hostId: string, name: string, version: string, profiles: string[],
     resources: ContainerResources, access: HostAccess = NO_HOST_ACCESS,
+    defaultTemplateId: string | null = null,
   ): Promise<{ id: string }> {
     return this.http.post('/api/containers', {
       hostId, name, version, profiles,
       memoryMb: resources.memoryMb, cpus: resources.cpus,
       ports: access.ports, env: access.env, mounts: access.mounts,
-    });
+      defaultTemplateId,
+    }, 300_000);
   }
 
   start(hostId: string, id: string): Promise<void> {

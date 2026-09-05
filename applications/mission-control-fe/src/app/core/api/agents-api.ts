@@ -7,7 +7,7 @@ import { AgentMcpApi } from './agent-mcp-api';
 import { AgentRef, agentPath } from './agent-ref';
 import { AgentSkillsApi } from './agent-skills-api';
 import { AgentWebhooksApi } from './agent-webhooks-api';
-import { ApiHttp, seg } from './http';
+import { ApiHttp, CONTAINER_WRITE_TIMEOUT_MS, seg } from './http';
 
 /** A new profile's model wiring. `cloneFrom`/`fromTemplateId` seed its files. */
 export interface CreateAgentRequest {
@@ -50,7 +50,7 @@ export class AgentsApi {
   }
 
   create(request: CreateAgentRequest): Promise<ApiAgentProfile> {
-    return this.http.post('/api/agents', request);
+    return this.http.post('/api/agents', request, CONTAINER_WRITE_TIMEOUT_MS);
   }
 
   remove(ref: AgentRef): Promise<void> {

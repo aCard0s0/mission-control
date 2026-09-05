@@ -119,10 +119,18 @@ public class DockerGateway {
 
   // ── lifecycle ────────────────────────────────────────────────────────────
 
+  /** A deploy with nothing to do after the gateway is ready. */
   public String deploy(
       DockerHostRef host, String name, String version, List<String> profiles,
       ContainerResources resources, HostAccess access) {
     return deployer.deploy(host, name, version, profiles, resources, access);
+  }
+
+  /** {@code afterReady} runs inside the deployer's rollback guard — see {@link HermesDeployer#deploy}. */
+  public String deploy(
+      DockerHostRef host, String name, String version, List<String> profiles,
+      ContainerResources resources, HostAccess access, java.util.function.Consumer<String> afterReady) {
+    return deployer.deploy(host, name, version, profiles, resources, access, afterReady);
   }
 
   public ManagedContainerSpec inspectManaged(DockerHostRef host, String containerId) {

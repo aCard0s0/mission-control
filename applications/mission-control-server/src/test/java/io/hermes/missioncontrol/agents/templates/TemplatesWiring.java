@@ -10,6 +10,8 @@ import io.hermes.missioncontrol.skills.GuideDeploy;
 import io.hermes.missioncontrol.skills.SkillDeployer;
 import io.hermes.missioncontrol.skills.SkillGuideRepository;
 import io.hermes.missioncontrol.skills.SkillRepository;
+import java.util.function.Supplier;
+import org.mockito.Mockito;
 
 /**
  * Builds the template collaborator graph the way Spring does, for tests that drive a whole flow
@@ -28,6 +30,20 @@ import io.hermes.missioncontrol.skills.SkillRepository;
 final class TemplatesWiring {
 
   private TemplatesWiring() {}
+
+  /**
+   * A mocked {@link HermesProfiles} whose {@code whileCreating} still runs the work handed to
+   * it. Same reason {@code AgentsWiring.mockFiles} does this for {@code serialized}: the deploy
+   * flows now run inside that window, and a bare mock would return null without creating or
+   * applying anything — every deploy assertion would then pass vacuously or fail on a null.
+   */
+  @SuppressWarnings("unchecked")
+  static HermesProfiles profilesMock() {
+    HermesProfiles profiles = Mockito.mock(HermesProfiles.class);
+    Mockito.when(profiles.whileCreating(Mockito.anyString(), Mockito.anyString(), Mockito.any(Supplier.class)))
+        .thenAnswer(call -> call.<Supplier<?>>getArgument(2).get());
+    return profiles;
+  }
 
   /** The skill library and guide collaborators a deploy resolves its references through. */
   record Libraries(
