@@ -3,7 +3,7 @@ type: object
 cluster: models
 universe: live
 status: verified
-verified: claude/hermes-openai-api-key @ e4e23e4 · 2026-09-05
+verified: claude/codex-picker @ 6cc1283 · 2026-09-22
 entity: applications/mission-control-server/src/main/java/io/hermes/missioncontrol/agents/ModelProviderRegistry.java
 ---
 
