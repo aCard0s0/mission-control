@@ -146,8 +146,9 @@ public class ContainerInventory {
     for (Container c : containers) {
       present.add(exclusionKey(host.id(), primaryName(c)));
       live.add(startedAtKey(host.id(), c.getId()));
-      if (!includeAll && !isFleetMember(host.id(), c)) continue;
-      result.add(toDto(client, c, host, digests, sizes));
+      String image = imageReference(client, c);
+      if (!includeAll && !isFleetMember(host.id(), c, image)) continue;
+      result.add(toDto(client, c, image, host, digests, sizes));
     }
     // every call lists the whole daemon (withShowAll), so anything this host reported before
     // and does not report now is gone; other hosts' entries are left alone
@@ -239,9 +240,8 @@ public class ContainerInventory {
 
   /** Whether the filtered fleet view shows this container. Every rejection is logged or
    *  commented at the point it is made, because each hid a container an operator looked for. */
-  private boolean isFleetMember(String hostId, Container c) {
+  private boolean isFleetMember(String hostId, Container c, String image) {
     String name = primaryName(c);
-    String image = c.getImage() == null ? "" : c.getImage();
     Map<String, String> labels = c.getLabels() == null ? Map.of() : c.getLabels();
 
     if (ParkedContainerName.isUpgradeLeftover(name)) {
@@ -265,6 +265,7 @@ public class ContainerInventory {
     if (ManagedContainer.isManaged(labels)) return true;
 
     if (isImageIdReference(image)) {
+      // only when inspect could not say either — see imageReference
       if (firstReportOf(hostId, name)) {
         log.warn("hiding {} from the fleet: it reports an image id rather than a reference "
             + "and carries no Mission Control label", name);
@@ -283,15 +284,15 @@ public class ContainerInventory {
   }
 
   private ContainerDto toDto(
-      DockerClient client, Container c, DockerHostRef host, Map<String, String> digestCache,
-      Map<String, Double> sizes) {
+      DockerClient client, Container c, String image, DockerHostRef host,
+      Map<String, String> digestCache, Map<String, Double> sizes) {
     String hostId = host.id();
     String name = primaryName(c);
-    String[] imageParts = ImageRef.splitImage(c.getImage());
-    if (isImageIdReference(c.getImage())) {
+    String[] imageParts = ImageRef.splitImage(image);
+    if (isImageIdReference(image)) {
       // "sha256:e5b3…" would otherwise render as repository "sha256" with the hex as the
-      // version. Report the repository the container is known to run and leave the tag
-      // blank — the reference it was created from is genuinely no longer recoverable here.
+      // version. Inspect could not recover the reference either (see imageReference), so
+      // report the repository the container is known to run and leave the tag blank.
       imageParts = new String[]{images.hermesRepository(), ""};
     }
     String status = mapStatus(c.getState(), c.getStatus());
@@ -359,6 +360,26 @@ public class ContainerInventory {
       }
     });
     return digest.isBlank() ? null : digest;
+  }
+
+  /**
+   * The image reference this container runs. The listing resolves the stored reference
+   * against the image store and substitutes the bare image id once that stops resolving —
+   * moving a floating tag does it to every container left on the old layer — but inspect
+   * keeps {@code Config.Image}, the reference the container was created from, verbatim. So
+   * an id in the listing is answered from there; the id itself only when inspect cannot say.
+   */
+  private static String imageReference(DockerClient client, Container c) {
+    String listed = c.getImage() == null ? "" : c.getImage();
+    if (!isImageIdReference(listed)) return listed;
+    try {
+      // ponytail: one inspect per id-reporting container per poll; key a cache by container
+      // id if a daemon ever carries more than a handful of them
+      String created = client.inspectContainerCmd(c.getId()).exec().getConfig().getImage();
+      return created == null || created.isBlank() ? listed : created;
+    } catch (RuntimeException unavailable) {
+      return listed;
+    }
   }
 
   private static String primaryName(Container c) {
