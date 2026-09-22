@@ -2,6 +2,8 @@ package io.hermes.missioncontrol.models;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.hermes.missioncontrol.agents.ModelProviderRegistry;
+import io.hermes.missioncontrol.credentials.CredentialService;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -11,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,21 +40,29 @@ public class ModelCatalogService {
    *
    * <p>Everything else in {@link io.hermes.missioncontrol.agents.ModelProviderRegistry}
    * answers 401 (Anthropic, OpenAI, xAI, DeepSeek, Kimi, Z.AI, StepFun, MiniMax) or 403
-   * (Google AI Studio) without a key, and so cannot be refreshed by a background job that
-   * holds none. Those keep their curated list, and {@link #live} remains the way to read
-   * them — with a key the caller supplies for that one request.
+   * (Google AI Studio) without a key. The background job reads those only when a saved
+   * credential holds their key ({@link #KEYED_CATALOGS}); otherwise they keep their curated
+   * list until {@link #live} reads them with a key the caller supplies.
    */
   static final List<String> PUBLIC_CATALOGS = List.of("openrouter", "nvidia", "nous");
 
+  /** Providers with a fetcher that needs a key. The refresh borrows one from a saved
+   *  credential when there is one; a fetched list is stored either way, so one read with a
+   *  key — by the job or by an operator in the picker — is what every later picker gets. */
+  static final List<String> KEYED_CATALOGS = List.of("anthropic", "openai-api");
+
   private final ModelCatalogProperties props;
   private final ModelCatalogRepository repository;
+  private final CredentialService credentials;
   private final ObjectMapper objectMapper;
   private final HttpClient http = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
 
   public ModelCatalogService(
-      ModelCatalogProperties props, ModelCatalogRepository repository, ObjectMapper objectMapper) {
+      ModelCatalogProperties props, ModelCatalogRepository repository,
+      CredentialService credentials, ObjectMapper objectMapper) {
     this.props = props;
     this.repository = repository;
+    this.credentials = credentials;
     this.objectMapper = objectMapper;
   }
 
@@ -72,33 +83,57 @@ public class ModelCatalogService {
   }
 
   /**
-   * Re-reads every keyless provider and stores what came back. Never throws: one
-   * provider being down must not stop the other two being refreshed, and the whole
-   * job runs unattended twice a day with nobody to catch anything it raised.
+   * Re-reads every keyless provider, plus every keyed one a saved credential can unlock, and
+   * stores what came back. Never throws: one provider being down must not stop the others
+   * being refreshed, and the whole job runs unattended twice a day with nobody to catch
+   * anything it raised.
    *
    * @return the providers that were actually updated
    */
   public List<String> refreshAll() {
     List<String> refreshed = new ArrayList<>();
     for (String provider : PUBLIC_CATALOGS) {
-      if (refresh(provider)) refreshed.add(provider);
+      if (refresh(provider, null)) refreshed.add(provider);
+    }
+    for (String provider : KEYED_CATALOGS) {
+      savedKeyFor(provider).ifPresent(key -> {
+        if (refresh(provider, key)) refreshed.add(provider);
+      });
     }
     return refreshed;
   }
 
-  /** One provider. False when it could not be read, or answered with nothing usable. */
+  /** A saved credential's key for this provider's variable, or empty when none holds one —
+   *  or when the one that does cannot be opened, which is the operator's problem to fix on
+   *  the Credentials page, not this job's to report twice a day. */
+  private Optional<String> savedKeyFor(String provider) {
+    String envVar = ModelProviderRegistry.envVar(provider);
+    if (envVar == null) return Optional.empty();
+    try {
+      return credentials.anyValueFor(envVar);
+    } catch (RuntimeException e) {
+      log.warn("model catalog refresh for {} skipped — saved {} unusable: {}", provider, envVar,
+          e.toString());
+      return Optional.empty();
+    }
+  }
+
+  /** One keyless provider. False when it could not be read, or answered with nothing usable. */
   public boolean refresh(String provider) {
+    return refresh(provider, null);
+  }
+
+  private boolean refresh(String provider, String apiKey) {
     String normalized = normalize(provider);
     try {
-      List<String> models = fetch(normalized, null);
-      if (models.isEmpty()) {
+      List<String> models = fetch(normalized, apiKey);
+      if (!store(normalized, models)) {
         // 200-with-nothing is far more likely a changed response shape than a vendor
         // with no models, and storing it would empty the picker on the strength of a guess
         log.warn("model catalog refresh for {} returned no models — keeping the previous list",
             normalized);
         return false;
       }
-      repository.replace(normalized, models, System.currentTimeMillis());
       log.info("model catalog refreshed for {}: {} models", normalized, models.size());
       return true;
     } catch (Exception e) {
@@ -110,7 +145,20 @@ public class ModelCatalogService {
     }
   }
 
-  /** Live list from the provider API; falls back to the configured list. */
+  /** Replaces the stored list, unless the provider answered with nothing. */
+  private boolean store(String provider, List<String> models) {
+    if (models.isEmpty()) return false;
+    repository.replace(provider, models, System.currentTimeMillis());
+    return true;
+  }
+
+  /**
+   * Live list from the provider API; falls back to the configured list.
+   *
+   * <p>What came back is stored too. A key-only provider's list used to be current for exactly
+   * the operator who typed a key into one dialog, and shipped-with for everyone else — so the
+   * one read a key makes possible now serves every later picker, the same way the job's does.
+   */
   public ModelCatalogDto live(String provider, String apiKey) {
     String normalized = normalize(provider);
     // resolve the fallback defensively: a provider the registry lists but has no
@@ -118,6 +166,7 @@ public class ModelCatalogService {
     List<String> configured = configuredModelsOrEmpty(normalized);
     try {
       List<String> models = fetch(normalized, apiKey);
+      store(normalized, models);
       return new ModelCatalogDto(normalized, models, "live");
     } catch (Exception e) {
       if (e instanceof InterruptedException) Thread.currentThread().interrupt();
@@ -241,6 +290,6 @@ public class ModelCatalogService {
   /** The registry's spelling, so a catalog asked for under a key hermes has since renamed
    *  (`openai`, now `openai-api`) still answers, and answers under the current key. */
   private String normalize(String provider) {
-    return io.hermes.missioncontrol.agents.ModelProviderRegistry.normalizeKey(provider);
+    return ModelProviderRegistry.normalizeKey(provider);
   }
 }

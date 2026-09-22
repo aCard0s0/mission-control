@@ -9,7 +9,7 @@ import {
 import { ProfileDraft, newProfileDraft, profileDraftFrom } from './profile-editor';
 import { ProfileEditorPanel } from './profile-editor-panel';
 import { AGENT_ICONS } from '../shared/agent-icon';
-import { TestFixture, choose, el, field, fill, press, type } from '../testing/dom';
+import { TestFixture, choose, el, field, press, type } from '../testing/dom';
 import { catalogServer as sharedCatalogServer } from '../testing/models';
 import { provideStores } from '../testing/store';
 
@@ -262,11 +262,14 @@ describe('ProfileEditorPanel', () => {
   });
 });
 
-const modelInput = (fixture: TestFixture): HTMLInputElement =>
-  field(fixture, 'model').querySelector<HTMLInputElement>('.input')!;
+/** The model control — a dropdown while there is a list, a text input otherwise. */
+const modelInput = (fixture: TestFixture): HTMLInputElement | HTMLSelectElement =>
+  field(fixture, 'model').querySelector<HTMLInputElement | HTMLSelectElement>('.select, .input')!;
 
+/** The dropdown's entries, without the trailing "other…" that hands over to free text. */
 const modelOptions = (fixture: TestFixture): string[] =>
-  Array.from(el(fixture).querySelectorAll<HTMLOptionElement>('#bp-model-list option')).map(o => o.value);
+  Array.from(el(fixture).querySelectorAll<HTMLOptionElement>('#bp-model option'))
+    .map(o => o.value).filter(Boolean);
 
 describe('ProfileEditorPanel model', () => {
   it('offers the provider\'s catalog, keeping a stored model the list does not carry', async () => {
@@ -274,7 +277,8 @@ describe('ProfileEditorPanel model', () => {
     const { fixture, store } = await render(storeStub(), newProfileDraft(), 'closed');
 
     expect(store.providers.modelCatalog).toHaveBeenCalledWith('nous');
-    expect(modelOptions(fixture)).toEqual(['claude-opus-5', 'claude-sonnet-5']);
+    // the stored one leads the list rather than being silently replaced by the first suggestion
+    expect(modelOptions(fixture)).toEqual(['Hermes-4-405B', 'claude-opus-5', 'claude-sonnet-5']);
     expect(modelInput(fixture).value).toBe('Hermes-4-405B');
   });
 
@@ -305,7 +309,7 @@ describe('ProfileEditorPanel model', () => {
     const draft = { ...newProfileDraft(), name: 'ops-sre' };
     const { fixture, store } = await render(storeStub(), draft, 'closed');
 
-    await fill(fixture, 'model', 'claude-sonnet-5');
+    await choose(fixture, 'model', 'claude-sonnet-5');
     press(fixture, 'create template', '.editor-actions');
     await fixture.whenStable();
 

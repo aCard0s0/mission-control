@@ -14,6 +14,7 @@ import { TemplateStore } from '../core/store/template-store';
 import { McpCatalogServer, ProfileTemplate, SkillGuide, TemplateMcp } from '../core/models';
 import { AGENT_ICONS, AgentIconView } from '../shared/agent-icon';
 import { McpEndpointForm } from '../shared/mcp-endpoint-form';
+import { ModelField } from '../shared/model-field';
 import { ModelPicker, modelCatalogFor } from '../shared/model-picker';
 import { StatusDot } from '../shared/status-dot';
 import { providerOptions } from '../shared/provider-resolve';
@@ -43,7 +44,7 @@ import {
 @Component({
   selector: 'mc-profile-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, AgentIconView, StatusDot],
+  imports: [FormsModule, RouterLink, AgentIconView, ModelField, StatusDot],
   templateUrl: './profile-editor-panel.html',
   styleUrl: './profile-editor-panel.scss',
 })

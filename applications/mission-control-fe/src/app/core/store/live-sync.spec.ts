@@ -655,7 +655,7 @@ describe('live registries', () => {
     });
 
     const fromConfig = await store.providers.modelCatalog('anthropic');
-    const fromKey = await store.providers.modelCatalogLive('anthropic', 'sk-ant-x');
+    const fromKey = await store.providers.modelCatalogLive('anthropic', { apiKey: 'sk-ant-x' });
 
     // no shipped copy stands in: an unreachable backend shows nothing, here as everywhere
     expect(fromConfig).toEqual({ models: [], source: null });

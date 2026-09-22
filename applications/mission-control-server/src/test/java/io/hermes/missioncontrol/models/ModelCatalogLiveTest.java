@@ -5,8 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.hermes.missioncontrol.credentials.CredentialService;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -41,10 +48,11 @@ class ModelCatalogLiveTest {
       "meta/llama-3.3-70b-instruct");
 
   private final List<HttpRequest> sent = new ArrayList<>();
+  private final ModelCatalogRepository repository = mock(ModelCatalogRepository.class);
 
   /** A service whose provider calls are answered from {@code responder} instead of the network. */
   private ModelCatalogService serviceAnswering(Function<HttpRequest, String> responder) {
-    return new ModelCatalogService(PROPS, mock(ModelCatalogRepository.class), new ObjectMapper()) {
+    return new ModelCatalogService(PROPS, repository, mock(CredentialService.class), new ObjectMapper()) {
       @Override
       String send(HttpRequest request) {
         sent.add(request);
@@ -54,7 +62,7 @@ class ModelCatalogLiveTest {
   }
 
   private ModelCatalogService serviceFailing(Exception failure) {
-    return new ModelCatalogService(PROPS, mock(ModelCatalogRepository.class), new ObjectMapper()) {
+    return new ModelCatalogService(PROPS, mock(ModelCatalogRepository.class), mock(CredentialService.class), new ObjectMapper()) {
       @Override
       String send(HttpRequest request) throws Exception {
         sent.add(request);
@@ -156,6 +164,39 @@ class ModelCatalogLiveTest {
     assertTrue(noData.live("anthropic", "k").models().isEmpty());
   }
 
+  // ── what is kept ────────────────────────────────────────────────────────
+
+  @Test
+  void aLiveListIsStoredSoEveryLaterPickerGetsIt() {
+    // a key-only provider's list used to be current for the one operator who typed a key and
+    // shipped-with for everyone else; one read with a key now serves them all
+    ModelCatalogService service = serviceAnswering(request ->
+        "{\"data\":[{\"id\":\"gpt-6\"},{\"id\":\"gpt-5.2\"}]}");
+
+    service.live("openai-api", "sk-openai-key");
+
+    verify(repository).replace(eq("openai-api"), eq(List.of("gpt-6", "gpt-5.2")), anyLong());
+  }
+
+  @Test
+  void anEmptyLiveAnswerIsReportedButNotStored() {
+    // same rule as the refresh: 200-with-nothing is a changed shape, not a vendor with no models
+    ModelCatalogService service = serviceAnswering(request -> "{\"data\":[]}");
+
+    assertTrue(service.live("anthropic", "k").models().isEmpty());
+
+    verify(repository, never()).replace(anyString(), anyList(), anyLong());
+  }
+
+  @Test
+  void aFailedLiveReadLeavesTheStoredListAlone() {
+    ModelCatalogService service = serviceFailing(new IllegalStateException("provider returned HTTP 401"));
+
+    service.live("anthropic", "sk-wrong");
+
+    verify(repository, never()).replace(anyString(), anyList(), anyLong());
+  }
+
   // ── fallback ────────────────────────────────────────────────────────────
 
   @Test
@@ -206,7 +247,7 @@ class ModelCatalogLiveTest {
   void aTwoHundredResponseIsReturnedAsItsBody() throws Exception {
     route(200, "{\"data\":[]}");
 
-    assertEquals("{\"data\":[]}", new ModelCatalogService(PROPS, mock(ModelCatalogRepository.class), new ObjectMapper()).send(get()));
+    assertEquals("{\"data\":[]}", new ModelCatalogService(PROPS, mock(ModelCatalogRepository.class), mock(CredentialService.class), new ObjectMapper()).send(get()));
   }
 
   @Test
@@ -215,7 +256,7 @@ class ModelCatalogLiveTest {
 
     assertEquals("provider returned HTTP 429",
         assertThrows(IllegalStateException.class,
-            () -> new ModelCatalogService(PROPS, mock(ModelCatalogRepository.class), new ObjectMapper()).send(get())).getMessage());
+            () -> new ModelCatalogService(PROPS, mock(ModelCatalogRepository.class), mock(CredentialService.class), new ObjectMapper()).send(get())).getMessage());
   }
 
   @Test
@@ -224,7 +265,7 @@ class ModelCatalogLiveTest {
     route(302, "");
 
     assertFalse(assertThrows(IllegalStateException.class,
-        () -> new ModelCatalogService(PROPS, mock(ModelCatalogRepository.class), new ObjectMapper()).send(get())).getMessage().isBlank());
+        () -> new ModelCatalogService(PROPS, mock(ModelCatalogRepository.class), mock(CredentialService.class), new ObjectMapper()).send(get())).getMessage().isBlank());
   }
 
   private HttpServer server;

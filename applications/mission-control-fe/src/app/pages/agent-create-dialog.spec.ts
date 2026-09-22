@@ -3,7 +3,8 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  AuthProvider, HermesContainer, LlmProvider, InferenceEndpoint, NewAgent, ProfileTemplate,
+  AuthProvider, Credential, HermesContainer, LlmProvider, InferenceEndpoint, NewAgent,
+  ProfileTemplate,
 } from '../core/models';
 import { AgentCreateDialog } from './agent-create-dialog';
 import { TestFixture, choose, el, field, fill, settle, text } from '../testing/dom';
@@ -33,9 +34,14 @@ const storeStub = (opts: {
   templates?: ProfileTemplate[];
   auth?: AuthProvider[];
   catalog?: string[];
+  credentials?: Credential[];
 } = {}) => {
   const templates = opts.templates ?? [];
   return {
+    credentials: {
+      providing: (envVar: string) =>
+        (opts.credentials ?? []).filter(c => c.entries.some(e => e.key === envVar)),
+    },
     providers: {
       llmProviders: signal(llm),
       modelCatalog: vi.fn().mockResolvedValue(
@@ -112,7 +118,7 @@ describe('AgentCreateDialog opening', () => {
     expect(store.providers.modelCatalog).toHaveBeenCalledWith('nous');
     expect(store.setup.authProviders).toHaveBeenCalledWith('c-1');
     expect(el(fixture).textContent).toContain('NEW AGENT PROFILE — hermes-prod');
-    expect(field(fixture, 'model').querySelector<HTMLInputElement>('.input')!.value)
+    expect(field(fixture, 'model').querySelector<HTMLSelectElement>('.select')!.value)
       .toBe('claude-opus-5');
   });
 
@@ -152,8 +158,19 @@ describe('AgentCreateDialog provider choice', () => {
     await choose(fixture, 'provider', 'ollama: workstation');
 
     expect(store.endpoints.models).toHaveBeenCalledWith('mp-1');
-    expect(field(fixture, 'model').querySelector<HTMLInputElement>('.input')!.value)
+    expect(field(fixture, 'model').querySelector<HTMLSelectElement>('.select')!.value)
       .toBe('gemma3:4b');
+  });
+
+  it('offers the whole catalog as a dropdown, not a datalist the current value filters', async () => {
+    // the first suggestion is preselected, and a browser filters a datalist by what the input
+    // holds — which showed one model and read as the whole catalog
+    const { fixture } = await render(storeStub());
+
+    const options = Array.from(field(fixture, 'model').querySelectorAll('option')).map(o => o.value);
+
+    expect(options).toEqual(['claude-opus-5', 'claude-sonnet-5', '']);
+    expect(field(fixture, 'model').querySelector('.input')).toBeNull();
   });
 
   it('offers no suggestions for a provider with no catalog, keeping the field free text', async () => {
@@ -162,7 +179,8 @@ describe('AgentCreateDialog provider choice', () => {
     await choose(fixture, 'provider', 'custom');
 
     expect(store.providers.modelCatalog).not.toHaveBeenCalledWith('custom');
-    expect(el(fixture).querySelectorAll('#agent-model-list option').length).toBe(0);
+    expect(field(fixture, 'model').querySelector('.select')).toBeNull();
+    expect(field(fixture, 'model').querySelector('.input')).toBeTruthy();
   });
 
   it('fetches the live catalog once a key is typed for a catalog-backed provider', async () => {
@@ -174,7 +192,25 @@ describe('AgentCreateDialog provider choice', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(store.providers.modelCatalogLive).toHaveBeenCalledWith('anthropic', 'sk-test');
+    expect(store.providers.modelCatalogLive).toHaveBeenCalledWith('anthropic', { apiKey: 'sk-test' });
+  });
+
+  it('fetches the live catalog through a saved credential the moment one is picked', async () => {
+    // this page never holds that key; the server reads it under the provider's own variable
+    const { fixture, store } = await render(storeStub({ credentials: [{
+      id: 'cred-1', name: 'anthropic prod', description: '', createdAt: 0, updatedAt: 0,
+      entries: [{ key: 'ANTHROPIC_API_KEY', value: '', secret: true, set: true, recoverable: true }],
+    }] }));
+    await choose(fixture, 'provider', 'anthropic');
+
+    const saved = field(fixture, 'API key').querySelector<HTMLSelectElement>('.select')!;
+    saved.value = 'cred-1';
+    saved.dispatchEvent(new Event('change'));
+    await settle(fixture);
+
+    expect(store.providers.modelCatalogLive)
+      .toHaveBeenCalledWith('anthropic', { credentialId: 'cred-1' });
+    expect(field(fixture, 'model').querySelector<HTMLSelectElement>('.select')!.value).toBe('live-model');
   });
 });
 
@@ -186,7 +222,7 @@ describe('AgentCreateDialog template prefill', () => {
 
     expect(field(fixture, 'provider').querySelector<HTMLSelectElement>('.select')!.value)
       .toBe('anthropic');
-    expect(field(fixture, 'model').querySelector<HTMLInputElement>('.input')!.value)
+    expect(field(fixture, 'model').querySelector<HTMLSelectElement>('.select')!.value)
       .toBe('claude-opus-5');
   });
 
@@ -228,7 +264,7 @@ describe('AgentCreateDialog auxiliary override', () => {
     const { fixture, store } = await render(storeStub());
     await fill(fixture, 'profile name', 'ops-bot');
     await toggleAux(fixture);
-    await fill(fixture, 'auxiliary model', 'claude-sonnet-5');
+    await choose(fixture, 'auxiliary model', 'claude-sonnet-5');
 
     await submit(fixture);
 
@@ -240,7 +276,7 @@ describe('AgentCreateDialog auxiliary override', () => {
     await fill(fixture, 'profile name', 'ops-bot');
     await toggleAux(fixture);
     await choose(fixture, 'auxiliary provider', 'anthropic');
-    await fill(fixture, 'auxiliary model', 'claude-sonnet-5');
+    await choose(fixture, 'auxiliary model', 'claude-sonnet-5');
     await fill(fixture, 'auxiliary API key', 'sk-aux');
 
     await submit(fixture);
@@ -250,11 +286,25 @@ describe('AgentCreateDialog auxiliary override', () => {
     });
   });
 
+  it('reads the override\'s provider live once its own key is typed', async () => {
+    const { fixture, store } = await render(storeStub());
+    await toggleAux(fixture);
+    await choose(fixture, 'auxiliary provider', 'anthropic');
+    await fill(fixture, 'auxiliary API key', 'sk-aux');
+
+    field(fixture, 'auxiliary API key').querySelector('.input')!.dispatchEvent(new Event('blur'));
+    await settle(fixture);
+
+    expect(store.providers.modelCatalogLive).toHaveBeenCalledWith('anthropic', { apiKey: 'sk-aux' });
+    expect(field(fixture, 'auxiliary model').querySelector<HTMLSelectElement>('.select')!.value)
+      .toBe('live-model');
+  });
+
   it('refuses an override that names no model', async () => {
     const { fixture } = await render(storeStub());
     await fill(fixture, 'profile name', 'ops-bot');
     await toggleAux(fixture);
-    await fill(fixture, 'auxiliary model', '');
+    await choose(fixture, 'auxiliary model', '');
 
     expect(submitButton(fixture).disabled).toBe(true);
   });
@@ -263,7 +313,7 @@ describe('AgentCreateDialog auxiliary override', () => {
     const { fixture, store } = await render(storeStub());
     await fill(fixture, 'profile name', 'ops-bot');
     await toggleAux(fixture);
-    await fill(fixture, 'auxiliary model', 'claude-sonnet-5');
+    await choose(fixture, 'auxiliary model', 'claude-sonnet-5');
     await toggleAux(fixture);
 
     await submit(fixture);
@@ -434,7 +484,7 @@ describe('AgentCreateDialog auxiliary on a self-hosted model', () => {
     await fill(fixture, 'profile name', 'ops-bot');
     await toggleAux(fixture);
     await choose(fixture, 'auxiliary provider', OLLAMA);
-    await fill(fixture, 'auxiliary model', 'gemma3:4b');
+    await choose(fixture, 'auxiliary model', 'gemma3:4b');
 
     await submit(fixture);
 
@@ -460,7 +510,7 @@ describe('AgentCreateDialog auxiliary on a self-hosted model', () => {
     await fill(fixture, 'profile name', 'ops-bot');
     await toggleAux(fixture);
     await choose(fixture, 'auxiliary provider', OLLAMA);
-    await fill(fixture, 'auxiliary model', 'gemma3:4b');
+    await choose(fixture, 'auxiliary model', 'gemma3:4b');
 
     store.endpoints.endpoints.set([]);
     await submit(fixture);

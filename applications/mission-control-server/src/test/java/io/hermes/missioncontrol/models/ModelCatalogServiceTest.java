@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.hermes.missioncontrol.credentials.CredentialService;
 import java.util.List;
 import java.util.NoSuchElementException;
 import static org.mockito.Mockito.mock;
@@ -21,6 +22,7 @@ class ModelCatalogServiceTest {
       "meta/llama-3.3-70b-instruct"),
       // nothing refreshed yet, so every read here falls through to the curated list
       mock(ModelCatalogRepository.class),
+      mock(CredentialService.class),
       new ObjectMapper());
 
   @Test

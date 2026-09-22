@@ -1,4 +1,5 @@
 import { inject, Injectable, signal } from '@angular/core';
+import { ApiLiveModelsRequest } from '../api/api-types';
 import { LlmProvider, ModelCatalog } from '../models';
 import { StoreContext } from './store-context';
 import { toLlmProvider } from './wire-mappers';
@@ -50,10 +51,10 @@ export class ProviderStore {
     }
   }
 
-  /** Fetch the catalog straight from the provider API using a key. */
-  async modelCatalogLive(provider: string, apiKey: string): Promise<ModelCatalog> {
+  /** Fetch the catalog straight from the provider API, with a typed key or a saved credential. */
+  async modelCatalogLive(provider: string, key: ApiLiveModelsRequest): Promise<ModelCatalog> {
     try {
-      const answered = await this.ctx.api.providers.modelCatalogLive(provider, apiKey);
+      const answered = await this.ctx.api.providers.modelCatalogLive(provider, key);
       return { models: answered.models, source: answered.source };
     } catch {
       return this.modelCatalog(provider);

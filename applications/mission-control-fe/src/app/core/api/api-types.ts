@@ -489,6 +489,13 @@ export interface ApiSession {
   status: 'open' | 'closed' | string;
 }
 
+/** How a live catalog read authenticates: a typed key, or a saved credential the server
+ *  resolves under the provider's own variable — one of the two. */
+export interface ApiLiveModelsRequest {
+  apiKey?: string;
+  credentialId?: string;
+}
+
 export interface ApiModelCatalog {
   provider: string;
   models: string[];
