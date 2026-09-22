@@ -28,6 +28,12 @@ import org.springframework.stereotype.Service;
  * outside it — an OAuth login, a key held elsewhere in the image — and is degraded to nothing
  * when the command cannot run.
  *
+ * <p>A third reading, {@code hermes auth list}, says whether a key still <em>works</em>. Hermes
+ * pools every credential it has seen and remembers the last failure against each — a 401 on a
+ * revoked key, a 402 on an exhausted account — and that pool outlives the {@code .env} line it
+ * came from, so a profile can read as fully configured while every turn dies on a dead key.
+ * Neither of the other two sources knows this; the pool is the only place it is written.
+ *
  * <p>What a {@code .env} may contain is {@link HermesEnvCatalog}'s, and how one is read and
  * written is {@link HermesEnvFile}'s. This class held all three, which is why the template it
  * generated had to be reached from {@code HermesEnvFile} by a static call back into it while
@@ -48,6 +54,10 @@ public class HermesSetup {
   private static final String SECTION_MARK = "◆";
 
   private static final Pattern RUN_HINT = Pattern.compile("run:\\s*([^)]+)");
+  private static final Pattern AUTH_LIST_HEADER = Pattern.compile("(\\S+) \\(\\d+ credentials?\\):");
+  private static final Pattern AUTH_LIST_ROW =
+      Pattern.compile("#\\d+\\s+\\S+\\s+\\S+\\s+id=\\S+\\s+priority=\\d+\\s+\\S+(.*)");
+  private static final String ACTIVE_MARK = "←";
   private static final Pattern ANSI = Pattern.compile("\u001B\\[[;\\d]*m");
 
   private final HermesContainerFiles files;
@@ -63,15 +73,18 @@ public class HermesSetup {
     boolean envExists = files.fileExists(host, containerId, envPath);
     Map<String, String> env = HermesEnvFile.parse(files.readFile(host, containerId, envPath));
     StatusReport report = runStatus(host, containerId, name);
+    Map<String, String> problems = pooledProblems(host, containerId, name);
 
     List<ApiKeyStatusDto> apiKeys = new ArrayList<>();
     for (HermesEnvCatalog.ApiKeySpec spec : HermesEnvCatalog.API_KEYS) {
       String value = envValue(env, spec);
+      String problem = problems.get(spec.envVar());
       if (value != null) {
-        apiKeys.add(new ApiKeyStatusDto(spec.label(), spec.envVar(), true, mask(value)));
+        apiKeys.add(new ApiKeyStatusDto(spec.label(), spec.envVar(), true, mask(value), problem));
       } else {
         StatusRow row = report == null ? null : report.row(SECTION_API_KEYS, spec.label());
-        apiKeys.add(new ApiKeyStatusDto(spec.label(), spec.envVar(), row != null && row.ok(), null));
+        apiKeys.add(new ApiKeyStatusDto(
+            spec.label(), spec.envVar(), row != null && row.ok(), null, problem));
       }
     }
 
@@ -79,7 +92,8 @@ public class HermesSetup {
     List<ApiKeyProviderDto> apiKeyProviders = new ArrayList<>();
     if (report != null) {
       for (StatusRow row : report.rows(SECTION_AUTH_PROVIDERS)) {
-        authProviders.add(new AuthProviderDto(row.label(), row.ok(), row.status(), hint(row.status())));
+        authProviders.add(new AuthProviderDto(row.label(), row.ok(), row.status(),
+            hint(row.status()), HermesEnvCatalog.AUTH_PROVIDER_KEYS.get(row.label())));
       }
       for (StatusRow row : report.rows(SECTION_API_KEY_PROVIDERS)) {
         apiKeyProviders.add(new ApiKeyProviderDto(row.label(), row.ok(), row.status()));
@@ -138,6 +152,47 @@ public class HermesSetup {
           name, containerId, e.toString());
       return null;
     }
+  }
+
+  /**
+   * What is wrong with each pooled credential, keyed by the {@code .env} variable its provider
+   * reads. Empty when {@code hermes auth list} cannot run: a key nothing is known about is
+   * reported as it always was, not as broken.
+   */
+  private Map<String, String> pooledProblems(DockerHostRef host, String containerId, String name) {
+    List<String> command = ProfilePaths.hermesCli(name, "auth", "list");
+    try {
+      return parseAuthList(files.exec(host, containerId, command).stdout());
+    } catch (RuntimeException e) {
+      log.warn("`hermes auth list` failed for profile {} in {} — pooled credential status "
+          + "unknown: {}", name, containerId, e.toString());
+      return Map.of();
+    }
+  }
+
+  /**
+   * {@code hermes auth list} prints one block per provider — {@code <key> (N credentials):} —
+   * with a row per credential: {@code #1 <label> <type> id=… priority=… <source> [<status>] [←]}.
+   * A healthy row ends at its source; whatever follows is hermes describing a failure, and the
+   * first such row wins for its provider. Providers the registry has no variable for — an OAuth
+   * login, a key this dashboard does not manage — are skipped: there is no key row to flag.
+   */
+  static Map<String, String> parseAuthList(String output) {
+    Map<String, String> problems = new LinkedHashMap<>();
+    String envVar = null;
+    for (String line : ANSI.matcher(output == null ? "" : output).replaceAll("").split("\\R")) {
+      String trimmed = line.trim();
+      Matcher header = AUTH_LIST_HEADER.matcher(trimmed);
+      if (header.matches()) {
+        envVar = ModelProviderRegistry.envVar(header.group(1));
+        continue;
+      }
+      Matcher row = AUTH_LIST_ROW.matcher(trimmed);
+      if (envVar == null || !row.matches()) continue;
+      String status = row.group(1).replace(ACTIVE_MARK, "").trim();
+      if (!status.isEmpty()) problems.putIfAbsent(envVar, status);
+    }
+    return problems;
   }
 
   /** Sections headed by "◆ <name>"; rows are 2-space indented

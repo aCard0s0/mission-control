@@ -20,6 +20,9 @@ import {
 } from '../shared/provider-resolve';
 import { Scrim } from '../shared/scrim';
 
+/** Hermes' own account, and what the form opens on. */
+const DEFAULT_PROVIDER = 'nous';
+
 /**
  * The new-agent form. Everything it collects is provider-shaped: which provider
  * serves the main model, whether that provider needs a key, and whether the
@@ -61,12 +64,13 @@ export class AgentCreateDialog {
   /** True once this dialog is closed; the create it started runs on without it. */
   private gone = false;
 
-  /** The LLM registry plus one entry per registered ollama instance. */
+  /** The LLM registry — minus the OAuth logins this container does not hold — plus one entry
+   *  per registered ollama instance. */
   protected readonly providerChoices = computed(() =>
-    providerOptions(this.providers.llmProviders(), this.endpoints.endpoints()));
+    providerOptions(this.providers.llmProviders().filter(p => this.offered(p)), this.endpoints.endpoints()));
 
   protected name = '';
-  protected provider = 'nous';
+  protected provider = DEFAULT_PROVIDER;
   protected apiKey = '';
   /** A saved credential picked instead of typing the key, or '' for none. */
   protected apiKeyCredentialId = '';
@@ -83,11 +87,10 @@ export class AgentCreateDialog {
   protected readonly main = new ModelPicker();
   protected readonly aux = new ModelPicker();
 
-  // Nous Portal OAuth status for this container — Nous needs an out-of-band
-  // `hermes portal` login, so warn when it is missing.
+  // The container's OAuth logins, as `hermes status` reports them. An OAuth provider is
+  // authenticated out of band — `hermes portal`, `hermes auth add openai-codex` — in the web
+  // terminal, once per container, and every profile in it shares the result.
   private readonly authProviders = signal<AuthProvider[]>([]);
-  protected readonly nousAuth = computed(() =>
-    this.authProviders().find(p => /nous/i.test(p.label)) ?? null);
 
   constructor() {
     inject(DestroyRef).onDestroy(() => { this.gone = true; });
@@ -103,6 +106,22 @@ export class AgentCreateDialog {
 
   private async loadAuthProviders(containerId: string): Promise<void> {
     this.authProviders.set(await this.setup.authProviders(containerId));
+  }
+
+  /** The container's login for an OAuth provider, or null when the report does not name it. */
+  protected authFor(providerKey: string): AuthProvider | null {
+    return this.authProviders().find(a => a.providerKey === providerKey) ?? null;
+  }
+
+  /**
+   * Whether the picker lists a provider. A key-based one always. An OAuth one only once this
+   * container reports its login: hermes needs a device flow this dashboard cannot drive, so
+   * offering the row anywhere else would build an agent that cannot answer. The default
+   * account is the exception — it is what the form opens on, and its row warns instead.
+   */
+  private offered(p: { key: string; oauth: boolean }): boolean {
+    if (!p.oauth || p.key === DEFAULT_PROVIDER) return true;
+    return this.authFor(p.key)?.ok ?? false;
   }
 
   protected onProvider(option: string): void {
@@ -269,7 +288,7 @@ export class AgentCreateDialog {
   }
 
   /** Registry entry for a provider option (null for an ollama instance). */
-  private providerInfo(option: string) {
+  protected providerInfo(option: string) {
     return this.providers.llmProviders().find(p => p.key === option) ?? null;
   }
 

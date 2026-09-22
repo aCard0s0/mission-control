@@ -1,6 +1,7 @@
 package io.hermes.missioncontrol.agents;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Every variable a profile's {@code .env} can hold that this dashboard knows about, and the
@@ -88,6 +89,15 @@ final class HermesEnvCatalog {
       new MessagingSpec("BlueBubbles", "BLUEBUBBLES_SERVER_URL", "BLUEBUBBLES_HOME_CHANNEL"),
       new MessagingSpec("QQBot", "QQ_APP_ID", "QQ_HOME_CHANNEL"),
       new MessagingSpec("Yuanbao", "YUANBAO_APP_ID", "YUANBAO_HOME_CHANNEL"));
+
+  /**
+   * The registry key behind each row {@code hermes status} prints under "Auth Providers" that
+   * the picker can point a profile at. Keyed by hermes' label like the tables above. A row
+   * missing here (Qwen, MiniMax, xAI) is still reported — it just names no provider to pick.
+   */
+  static final Map<String, String> AUTH_PROVIDER_KEYS = Map.of(
+      "Nous Portal", "nous",
+      "OpenAI Codex", "openai-codex");
 
   private HermesEnvCatalog() {}
 

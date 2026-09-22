@@ -90,8 +90,8 @@ class TemplateCaptureAndApplyTest {
         new SkillDto("s1", "refactor", "builtin", "1", "", true),
         new SkillDto("s2", "deploy", "builtin", "1", "", false)), List.of()));
     setupIs(List.of(
-        new ApiKeyStatusDto("Anthropic", "ANTHROPIC_API_KEY", true, "sk-…abcd"),
-        new ApiKeyStatusDto("OpenAI", "OPENAI_API_KEY", false, null)));
+        new ApiKeyStatusDto("Anthropic", "ANTHROPIC_API_KEY", true, "sk-…abcd", null),
+        new ApiKeyStatusDto("OpenAI", "OPENAI_API_KEY", false, null, null)));
 
     ProfileTemplateDto captured = service.captureFromAgent(HOST, CONTAINER, "scout", "ops");
 

@@ -74,7 +74,7 @@ class AgentSetupAndSessionsControllerTest {
     // not-yet-created agent would inherit
     hostIsConnected(hosts);
     when(setup.setup(HOST, CONTAINER, "default")).thenReturn(setupReport(
-        List.of(new AuthProviderDto("Nous Portal", true, "authenticated", null))));
+        List.of(new AuthProviderDto("Nous Portal", true, "authenticated", null, "nous"))));
 
     mvc.perform(get("/api/agents/" + HOST.id() + "/" + CONTAINER + "/auth-providers"))
         .andExpect(status().isOk())

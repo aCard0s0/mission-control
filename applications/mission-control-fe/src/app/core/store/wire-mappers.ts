@@ -394,6 +394,7 @@ function toSetupApiKey(api: ApiSetupApiKey): SetupApiKey {
     envVar: api.envVar ?? '',
     set: !!api.set,
     masked: api.masked ?? null,
+    problem: api.problem ?? null,
   };
 }
 
@@ -403,6 +404,7 @@ export function toAuthProvider(api: ApiSetupAuthProvider): AuthProvider {
     ok: !!api.ok,
     status: api.status ?? '',
     hint: api.hint ?? null,
+    providerKey: api.providerKey ?? null,
   };
 }
 

@@ -646,6 +646,10 @@ export interface SetupApiKey {
   envVar: string;
   set: boolean;
   masked: string | null;
+  /** What hermes' credential pool remembers going wrong with this key — `auth failed
+   *  invalid_api_key (401) …` — or null. The pool outlives the `.env` line, so a key can be
+   *  unset here and still be what every turn dies on. */
+  problem: string | null;
 }
 
 /** An OAuth login the container holds (Nous Portal and the like). `hint` is what to tell an
@@ -655,6 +659,9 @@ export interface AuthProvider {
   ok: boolean;
   status: string;
   hint: string | null;
+  /** The provider-registry key this login serves (`nous`, `openai-codex`), or null for a login
+   *  the picker cannot point a profile at. */
+  providerKey: string | null;
 }
 
 /** A provider whose key is present in the profile's `.env`, as hermes reports it. */

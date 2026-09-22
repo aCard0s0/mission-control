@@ -546,6 +546,7 @@ export interface ApiSetupApiKey {
   envVar: string;
   set: boolean;
   masked: string | null;
+  problem: string | null;         // what `hermes auth list` holds against the pooled credential
 }
 
 export interface ApiSetupAuthProvider {
@@ -553,6 +554,7 @@ export interface ApiSetupAuthProvider {
   ok: boolean;
   status: string;
   hint: string | null;
+  providerKey: string | null;     // the /api/providers key this login serves, if the picker has one
 }
 
 export interface ApiModelProvider {
