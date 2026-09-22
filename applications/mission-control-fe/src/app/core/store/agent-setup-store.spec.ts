@@ -7,7 +7,7 @@ import { apiProfile, liveError, loadedAgentSlices } from '../../testing/store';
 const setup = (patch: Partial<ApiAgentSetup> = {}): ApiAgentSetup => ({
   envPath: '/opt/data/atlas/.env',
   envExists: true,
-  apiKeys: [{ label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', set: true, masked: '…9f2c' }],
+  apiKeys: [{ label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', set: true, masked: '…9f2c', problem: null }],
   authProviders: [],
   apiKeyProviders: [],
   messaging: [],
@@ -90,7 +90,7 @@ describe('AgentSetupStore credentials', () => {
   });
 
   it('replaces the cache with what a write answered', async () => {
-    const keys = [{ label: 'OpenAI', envVar: 'OPENAI_API_KEY', set: true, masked: '…abcd' }];
+    const keys = [{ label: 'OpenAI', envVar: 'OPENAI_API_KEY', set: true, masked: '…abcd', problem: null }];
     const { store } = await loaded({
       setEnv: vi.fn().mockResolvedValue(setup({ apiKeys: keys })),
     });
@@ -152,7 +152,7 @@ describe('AgentSetupStore credentials', () => {
 
 describe('AgentSetupStore auth providers', () => {
   it('reads container-level auth status before any profile exists', async () => {
-    const providers = [{ label: 'Nous Portal', ok: true, status: 'authorized', hint: null }];
+    const providers = [{ label: 'Nous Portal', ok: true, status: 'authorized', hint: null, providerKey: 'nous' }];
     const { store } = await loaded({ authProviders: vi.fn().mockResolvedValue(providers) });
 
     expect(await store.authProviders('c-1')).toEqual(providers);

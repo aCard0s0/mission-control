@@ -23,6 +23,20 @@ the endpoint takes no profile name.
 
 Read-only. Mission Control reports what is there; hermes owns the credential store.
 
+Each row names the [Provider](provider-registry.md) key it serves — `providerKey`, mapped from
+hermes' label in `HermesEnvCatalog.AUTH_PROVIDER_KEYS` (`Nous Portal` → `nous`, `OpenAI Codex`
+→ `openai-codex`), null for a login the picker has no row for. That key is what lets the
+create-agent dialog offer an OAuth provider only where the container is logged into it.
+
+## What this does not tell you
+
+Whether a key still *works*. An OAuth login can be green here while every turn of a profile
+dies on a revoked API key, because the profile's `config.yaml` points at `openai-api` and
+hermes' credential pool remembers the 401 against it. The pool is a third source neither this
+endpoint nor the `.env` reads; `HermesSetup` asks `hermes auth list` for it and puts the answer
+on the per-profile setup's `apiKeys[].problem` — the pool outlives the `.env` line it was
+seeded from, so that is the one place a dead key shows.
+
 ## Shape
 
 `AuthProviderDto` — `agents/api/AuthProviderDto.java`. Derived from `HermesSetup`, which reads
@@ -40,7 +54,9 @@ the container. See also `ApiKeyStatusDto` and `ApiKeyProviderDto` in the same pa
 ## If you change this
 
 - **Hits:** the agent Setup panel (`pages/agent-setup-panel.ts`); `HermesSetup`;
-  `core/store/agent-setup-store.ts`.
+  `core/store/agent-setup-store.ts`; the create-agent dialog's provider list
+  (`pages/agent-create-dialog.ts`, `offered`), which reads `providerKey` and `ok` to decide
+  whether an OAuth row is shown at all.
 - **Does not hit:** the [Provider](provider-registry.md) list, which is compiled in and
   container-independent. Does not hit any other container — this is per-container by
   construction.

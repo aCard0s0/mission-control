@@ -60,9 +60,10 @@
       <div class="panel-b">
         @for (k of s.apiKeys; track k.envVar) {
           <div class="env-row">
-            <mc-status [status]="k.set ? 'up' : 'off'" [label]="k.label" />
+            <mc-status [status]="k.problem ? 'warn' : (k.set ? 'up' : 'off')" [label]="k.label" />
             <span class="mono faint var">{{ k.envVar }}</span>
             @if (k.masked) { <span class="mono dim masked">{{ k.masked }}</span> }
+            @if (k.problem) { <span class="chip warn mono" title="what hermes' credential pool holds against this key">{{ k.problem }}</span> }
             <span class="spacer"></span>
             @if (credentialsFor(k.envVar).length) {
               <select class="select cred-pick" [attr.aria-label]="'saved credential for ' + k.envVar"

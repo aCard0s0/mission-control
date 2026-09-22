@@ -11,8 +11,8 @@ import { provideStores } from '../testing/store';
 const setupFor = (name: string, patch: object = {}) => ({
   envPath: `/opt/data/profiles/${name}/.env`,
   envExists: true,
-  apiKeys: [{ label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', set: false, masked: null }],
-  authProviders: [{ label: 'Nous Portal', ok: false, status: 'not logged in', hint: 'hermes portal' }],
+  apiKeys: [{ label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', set: false, masked: null, problem: null }],
+  authProviders: [{ label: 'Nous Portal', ok: false, status: 'not logged in', hint: 'hermes portal', providerKey: 'nous' }],
   apiKeyProviders: [],
   messaging: [{
     label: 'Telegram', ok: false, status: 'not configured',
@@ -41,7 +41,7 @@ const storeStub = () => {
         [id]: setupFor(id, {
           apiKeys: [{
             label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY',
-            set: entries[0].value !== null, masked: entries[0].value ? '…here' : null,
+            set: entries[0].value !== null, masked: entries[0].value ? '…here' : null, problem: null,
           }],
         }),
       }));
@@ -178,7 +178,7 @@ describe('AgentSetupPanel', () => {
   it('clears a key that is already set, without typing anything', async () => {
     const store = storeStub();
     store.cache.set({ 'a-atlas': setupFor('a-atlas', {
-      apiKeys: [{ label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', set: true, masked: '…9f2c' }],
+      apiKeys: [{ label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', set: true, masked: '…9f2c', problem: null }],
     }) });
     const fixture = render(store);
     await fixture.whenStable();
@@ -188,6 +188,24 @@ describe('AgentSetupPanel', () => {
 
     expect(store.setup.setEnv).toHaveBeenCalledWith(
       'a-atlas', [{ key: 'ANTHROPIC_API_KEY', value: null }]);
+  });
+
+  it('flags a key whose pooled credential hermes remembers as failing, even once it is unset', async () => {
+    // the pool outlives the .env line: this key is not set anywhere the operator can see, and
+    // is still what every turn dies on
+    const store = storeStub();
+    store.cache.set({ 'a-atlas': setupFor('a-atlas', {
+      apiKeys: [{
+        label: 'OpenAI', envVar: 'OPENAI_API_KEY', set: false, masked: null,
+        problem: 'auth failed invalid_api_key (401) (re-auth may be required)',
+      }],
+    }) });
+    const fixture = render(store);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el(fixture).textContent).toContain('auth failed invalid_api_key (401)');
+    expect(el(fixture).querySelector('mc-status .dot.warn')).toBeTruthy();
   });
 
   it('offers to create a missing .env, and nothing to configure until it exists', async () => {

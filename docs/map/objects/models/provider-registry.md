@@ -33,7 +33,7 @@ the old key. The failure that produced is quiet: a profile whose `config.yaml` s
 `OpenAI ✓`, and then fails hermes' runtime resolver with `Unknown provider 'openai'` — which
 the interactive CLI reports as "No inference provider is configured yet — let's fix that".
 
-So the row is `openai-api`, and `normalizeKey` (`agents/ModelProviderRegistry.java:100`) folds
+So the row is `openai-api`, and `normalizeKey` (`agents/ModelProviderRegistry.java:107`) folds
 the retired spelling to it. Every path that writes `model.provider` or resolves an env var
 already goes through that method, and `byKey` does now too, so a blueprint or a live profile
 saved under the old key deploys, is served and masks its key under the new one. The
@@ -44,10 +44,22 @@ The cheap check when hermes moves again: `hermes -p <name> status` is not it. Ru
 resolver — `resolve_runtime_provider(requested=<key>)` from `hermes_cli.runtime_provider`, with
 the profile's `.env` exported — and compare `CANONICAL_PROVIDERS` slugs against `PROVIDERS`.
 
+## Device-flow logins
+
+Hermes' browser/device-flow OAuth providers — `openai-codex`, `xai-oauth`, `minimax-oauth`,
+`qwen-oauth` — need a login this dashboard cannot drive. Three of them are not listed. The
+Codex row is, because the login is *per container*: run once in the web terminal
+(`hermes auth add openai-codex`), it is inherited by every profile in that container, and the
+row is the only way to point a profile at it without a hand edit of `config.yaml`. It is
+`oauth=true`, no `envVar`, no catalog, and the create dialog offers it only where the
+container's [auth report](auth-provider.md) says it is logged in — a row offered anywhere
+else would build an agent that cannot answer. `nous` is the one OAuth row shown regardless:
+the form opens on it and warns instead.
+
 ## Shape
 
-`Provider(key, label, envVar, oauth, hasCatalog)` — `agents/ModelProviderRegistry.java:47`.
-~28 entries, `agents/ModelProviderRegistry.java:57`.
+`Provider(key, label, envVar, oauth, hasCatalog)` — `agents/ModelProviderRegistry.java:50`.
+~29 entries, `agents/ModelProviderRegistry.java:60`.
 
 - `envVar` null means the provider takes no key (OAuth or resolved elsewhere).
 - `hasCatalog` gates whether [Model catalog](model-catalog.md) can list names for it.
@@ -66,7 +78,9 @@ the profile's `.env` exported — and compare `CANONICAL_PROVIDERS` slugs agains
 
 - **Hits:** the create-agent and template UIs (the picker reads `/api/providers`); the
   "needs an API key" prompt; whether a provider offers a model catalog at all; the
-  `.env` key name written into a profile on create.
+  `.env` key name written into a profile on create. An OAuth row also needs a line in
+  `HermesEnvCatalog.AUTH_PROVIDER_KEYS`, or the [auth report](auth-provider.md) never names it
+  and the dialog never offers it.
 - **Does not hit:** [Inference endpoint](inference-endpoint.md) rows. A self-hosted Ollama
   is not a registry entry and adding one here does not create one. Nor does it hit
   `inference_endpoints` in SQLite. That table used to be called `model_providers`, which is what

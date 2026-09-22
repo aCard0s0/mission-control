@@ -280,8 +280,9 @@ describe('toAgentSetup', () => {
 
     expect(setup.envExists).toBe(false);
     expect(setup.apiKeys[0]).toEqual({
-      label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', set: false, masked: null,
+      label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', set: false, masked: null, problem: null,
     });
+    expect(setup.authProviders[0].providerKey).toBeNull();
     expect(setup.authProviders[0].ok).toBe(false);
     expect(setup.messaging[0]).toMatchObject({ ok: false, homeVar: null, homeChannel: null });
   });

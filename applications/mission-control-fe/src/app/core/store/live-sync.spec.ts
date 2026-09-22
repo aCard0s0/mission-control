@@ -826,7 +826,7 @@ describe('live profile writes', () => {
     const agent = store.agents.agents()[0];
     const answered = {
       envPath: `/opt/data/profiles/${agent.name}/.env`, envExists: true,
-      apiKeys: [{ label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', set: true, masked: '…9f2c' }],
+      apiKeys: [{ label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', set: true, masked: '…9f2c', problem: null }],
       authProviders: [], apiKeyProviders: [], messaging: [],
     };
     const setEnv = vi.fn().mockResolvedValue(answered);
@@ -958,7 +958,7 @@ describe('live setup cache', () => {
         setup: vi.fn().mockResolvedValue(answer(agent.name, { envExists: false })),
         setEnv: vi.fn().mockResolvedValue(answer(agent.name, {
           envExists: true,
-          apiKeys: [{ label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', set: true, masked: '…9f2c' }],
+          apiKeys: [{ label: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', set: true, masked: '…9f2c', problem: null }],
         })),
         initEnv: vi.fn().mockResolvedValue(answer(agent.name, { envExists: true })),
       },

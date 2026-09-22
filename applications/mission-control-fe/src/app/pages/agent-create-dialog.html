@@ -28,15 +28,15 @@
           <mc-model-field [picker]="main" controlId="new-model" />
         </div>
       </div>
-      @if (provider === 'nous') {
-        @if (nousAuth(); as auth) {
+      @if (providerInfo(provider)?.oauth) {
+        @if (authFor(provider); as auth) {
           @if (auth.ok) {
-            <p class="lock-hint ok">✓ Nous Portal connected on this container — no API key needed.</p>
+            <p class="lock-hint ok">✓ {{ auth.label }} connected on this container — no API key needed.</p>
           } @else {
-            <p class="lock-hint warn">✗ Nous Portal {{ auth.status }} — log in via <code>hermes portal</code> in the web terminal before this agent can run.</p>
+            <p class="lock-hint warn">✗ {{ auth.label }} {{ auth.status }} — log in via <code>{{ auth.hint || 'hermes portal' }}</code> in the web terminal before this agent can run.</p>
           }
         } @else {
-          <p class="lock-hint">Nous account is authenticated via <code>hermes portal</code> in the web terminal — no API key needed here.</p>
+          <p class="lock-hint">{{ providerInfo(provider)?.label }} is authenticated in the web terminal — no API key needed here.</p>
         }
       }
       @if (apiKeyRequired()) {

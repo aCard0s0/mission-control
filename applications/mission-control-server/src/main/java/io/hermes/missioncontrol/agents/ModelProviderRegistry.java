@@ -30,9 +30,12 @@ import java.util.Locale;
  * {@code copilot-acp}, which drive a desktop app or spawn a local binary and cannot work
  * from a container; {@code moa}, which resolves to a named Mixture-of-Agents preset
  * that a freshly created profile does not have yet — picking it at create time would
- * produce an agent that cannot answer; and the browser-login OAuth rows ({@code openai-codex},
- * {@code xai-oauth}, {@code minimax-oauth}, {@code qwen-oauth}), which need a device flow the
- * dashboard cannot drive.
+ * produce an agent that cannot answer; and the browser-login OAuth rows {@code xai-oauth},
+ * {@code minimax-oauth} and {@code qwen-oauth}, which need a device flow the dashboard cannot
+ * drive. {@code openai-codex} needs the same device flow and <em>is</em> listed: a container
+ * an operator has logged into once holds that login for every profile in it, and the picker
+ * offers the row only when the container's auth report says so — before this row existed the
+ * only way to point a profile at that login was a hand edit of {@code config.yaml}.
  *
  * <p>Hermes v0.21.0 (2026.8.31) split its {@code openai} row into {@code openai-api} (API key,
  * api.openai.com) and {@code openai-codex} (ChatGPT subscription). The old key is gone: a
@@ -61,6 +64,10 @@ public final class ModelProviderRegistry {
       new Provider("novita", "NovitaAI", "NOVITA_API_KEY", false, false),
       new Provider("anthropic", "Anthropic", "ANTHROPIC_API_KEY", false, true),
       new Provider("openai-api", "OpenAI API", "OPENAI_API_KEY", false, true),
+      // ChatGPT-subscription OpenAI: `hermes auth add openai-codex` in the terminal, once per
+      // container. Offered by the picker only where that login is reported (see the FE dialog);
+      // no catalog, because its model list is served to the logged-in account, not to a key.
+      new Provider("openai-codex", "OpenAI Codex (ChatGPT login)", null, true, false),
       new Provider("alibaba", "Qwen Cloud", "DASHSCOPE_API_KEY", false, false),
       new Provider("xiaomi", "Xiaomi MiMo", "XIAOMI_API_KEY", false, false),
       new Provider("tencent-tokenhub", "Tencent TokenHub", "TOKENHUB_API_KEY", false, false),

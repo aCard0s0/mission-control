@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +50,13 @@ class HermesSetupTest {
 
   private void statusOutput(String stdout) {
     when(files.exec(any(), anyString(), any()))
+        .thenReturn(new io.hermes.missioncontrol.docker.DockerExecService.ExecResult(0, stdout, ""));
+  }
+
+  /** What {@code hermes auth list} answers; {@code hermes status} keeps answering {@code stdout}
+   *  from {@link #statusOutput}. */
+  private void authListOutput(String stdout) {
+    when(files.exec(any(), anyString(), argThat(cmd -> cmd != null && cmd.contains("auth"))))
         .thenReturn(new io.hermes.missioncontrol.docker.DockerExecService.ExecResult(0, stdout, ""));
   }
 
@@ -147,6 +155,72 @@ class HermesSetupTest {
     statusOutput("[1m◆ API Keys[0m\n  [32mOpenAI[0m  ✓ configured\n");
 
     assertTrue(key(run(), "OPENAI_API_KEY").set());
+  }
+
+  @Test
+  void aFailingPooledCredentialIsFlaggedOnTheKeyRowItsProviderReads() {
+    // the format `hermes auth list` prints, one block per provider; the codex block is an
+    // OAuth login with no .env variable and must not be pinned on any key row
+    authListOutput("""
+        openai-api (1 credentials):
+          #1  OPENAI_API_KEY       api_key id=cd6000 priority=0 env:OPENAI_API_KEY auth failed invalid_api_key (401) (re-auth may be required)
+
+        openai-codex (1 credentials):
+          #1  device_code          oauth   id=25a6f2 priority=0 device_code ←
+
+        anthropic (1 credentials):
+          #1  ANTHROPIC_API_KEY    api_key id=9a1b2c priority=0 env:ANTHROPIC_API_KEY ←
+        """);
+
+    AgentSetupDto dto = run();
+    assertEquals("auth failed invalid_api_key (401) (re-auth may be required)",
+        key(dto, "OPENAI_API_KEY").problem());
+    // a healthy row ends at its source; the active marker is not a problem
+    assertNull(key(dto, "ANTHROPIC_API_KEY").problem());
+    assertNull(key(dto, "OPENROUTER_API_KEY").problem());
+  }
+
+  @Test
+  void aPooledProblemSurvivesTheKeyBeingGoneFromTheEnvFile() {
+    // hermes keeps the pool entry after the .env line is deleted — this is the case the
+    // other two sources cannot see: `hermes status` says "not set", the .env agrees, and
+    // every turn still dies on the remembered key
+    envFile("");
+    authListOutput("""
+        openai-api (1 credentials):
+          #1  OPENAI_API_KEY  api_key id=60af95 priority=0 env:OPENAI_API_KEY billing credit_balance_exhausted (402)
+        """);
+
+    ApiKeyStatusDto openai = key(run(), "OPENAI_API_KEY");
+    assertFalse(openai.set());
+    assertEquals("billing credit_balance_exhausted (402)", openai.problem());
+  }
+
+  @Test
+  void aFailingAuthListLeavesEveryKeyWithoutAProblemRatherThanFailingTheRequest() {
+    when(files.exec(any(), anyString(), argThat(cmd -> cmd != null && cmd.contains("auth"))))
+        .thenThrow(new RuntimeException("exec failed"));
+    envFile("OPENAI_API_KEY=sk-1234567890abcd\n");
+
+    ApiKeyStatusDto openai = key(run(), "OPENAI_API_KEY");
+    assertTrue(openai.set());
+    assertNull(openai.problem());
+  }
+
+  @Test
+  void anAuthProviderNamesTheRegistryKeyItLogsInto() {
+    statusOutput("""
+        ◆ Auth Providers
+          Nous Portal   ✗ not logged in (run: hermes portal)
+          OpenAI Codex  ✓ logged in
+          Qwen OAuth    ✗ not logged in (run: qwen auth qwen-oauth)
+        """);
+
+    List<AuthProviderDto> rows = run().authProviders();
+    assertEquals("nous", rows.get(0).providerKey());
+    assertEquals("openai-codex", rows.get(1).providerKey());
+    // reported, but nothing in the picker to point a profile at
+    assertNull(rows.get(2).providerKey());
   }
 
   @Test

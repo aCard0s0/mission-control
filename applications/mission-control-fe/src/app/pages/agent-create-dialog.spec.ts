@@ -13,6 +13,7 @@ import { provideStores } from '../testing/store';
 
 const llm: LlmProvider[] = [
   { key: 'nous', label: 'Nous Portal', needsKey: false, oauth: true, hasCatalog: true, envVar: null },
+  { key: 'openai-codex', label: 'OpenAI Codex (ChatGPT login)', needsKey: false, oauth: true, hasCatalog: false, envVar: null },
   { key: 'anthropic', label: 'Anthropic', needsKey: true, oauth: false, hasCatalog: true,
     envVar: 'ANTHROPIC_API_KEY' },
   { key: 'custom', label: 'Custom endpoint', needsKey: true, oauth: false, hasCatalog: false,
@@ -124,7 +125,7 @@ describe('AgentCreateDialog opening', () => {
 
   it('warns when Nous Portal has not been logged in on this container', async () => {
     const { fixture } = await render(storeStub({
-      auth: [{ label: 'Nous Portal', ok: false, status: 'not logged in' }] as AuthProvider[],
+      auth: [{ label: 'Nous Portal', ok: false, status: 'not logged in', hint: 'hermes portal', providerKey: 'nous' }] as AuthProvider[],
     }));
 
     expect(el(fixture).textContent).toContain('Nous Portal not logged in');
@@ -132,7 +133,7 @@ describe('AgentCreateDialog opening', () => {
 
   it('confirms the login rather than asking for a key it does not need', async () => {
     const { fixture } = await render(storeStub({
-      auth: [{ label: 'Nous Portal', ok: true, status: 'ok' }] as AuthProvider[],
+      auth: [{ label: 'Nous Portal', ok: true, status: 'ok', hint: null, providerKey: 'nous' }] as AuthProvider[],
     }));
 
     expect(el(fixture).textContent).toContain('Nous Portal connected on this container');
@@ -140,7 +141,44 @@ describe('AgentCreateDialog opening', () => {
   });
 });
 
+const codexLogin = (ok: boolean): AuthProvider => ({
+  label: 'OpenAI Codex', ok, status: ok ? 'logged in' : 'not logged in',
+  hint: ok ? null : 'hermes auth add openai-codex', providerKey: 'openai-codex',
+});
+
+const providerValues = (fixture: TestFixture): string[] =>
+  Array.from(field(fixture, 'provider').querySelectorAll('option')).map(o => o.value);
+
 describe('AgentCreateDialog provider choice', () => {
+  it('offers a device-flow OAuth provider only once this container reports its login', async () => {
+    // the login is a device flow the dashboard cannot drive, so a row offered on a container
+    // that never ran it would build an agent that cannot answer
+    const { fixture: unseen } = await render(storeStub());
+    expect(providerValues(unseen)).not.toContain('openai-codex');
+
+    const { fixture: refused } = await render(storeStub({ auth: [codexLogin(false)] }));
+    expect(providerValues(refused)).not.toContain('openai-codex');
+
+    const { fixture: logged } = await render(storeStub({ auth: [codexLogin(true)] }));
+    expect(providerValues(logged)).toContain('openai-codex');
+    // the default account keeps its row either way — the form opens on it and warns
+    expect(providerValues(unseen)).toContain('nous');
+  });
+
+  it('points a profile at the container\'s Codex login without a key or a catalog', async () => {
+    const { fixture, store } = await render(storeStub({ auth: [codexLogin(true)] }));
+
+    await choose(fixture, 'provider', 'openai-codex');
+    expect(text(fixture)).toContain('OpenAI Codex connected on this container');
+    expect(() => field(fixture, 'API key')).toThrow();
+
+    await fill(fixture, 'profile name', 'trader03');
+    await fill(fixture, 'model', 'gpt-5.5');   // no catalog: the field is free text
+    await submit(fixture);
+
+    expect(sent(store)).toMatchObject({ provider: 'openai-codex', model: 'gpt-5.5', apiKey: '' });
+  });
+
   it('asks for a key only for a provider that needs one', async () => {
     const { fixture } = await render(storeStub());
     expect(() => field(fixture, 'API key')).toThrow();

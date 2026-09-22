@@ -26,6 +26,18 @@ class ModelProviderRegistryTest {
       Set.of("anthropic", "openai-api", "nous", "openrouter", "nvidia");
 
   @Test
+  void theCodexRowIsAnOauthLoginWithNoKeyToCollectAndNoCatalogToList() {
+    // the one device-flow OAuth row that is offered: the container holds the login, the
+    // picker must neither ask for a key nor promise a model list it cannot fetch
+    Provider codex = ModelProviderRegistry.byKey("openai-codex");
+    assertNotNull(codex);
+    assertTrue(codex.oauth());
+    assertFalse(codex.needsKey());
+    assertNull(codex.envVar());
+    assertFalse(codex.hasCatalog());
+  }
+
+  @Test
   void everyProviderKeyIsUniqueAndLowercase() {
     Set<String> seen = new HashSet<>();
     for (Provider p : ModelProviderRegistry.PROVIDERS) {
@@ -80,7 +92,8 @@ class ModelProviderRegistryTest {
     assertEquals("openai-api", ModelProviderRegistry.normalizeKey(" OpenAI "));
     assertEquals("openai-api", ModelProviderRegistry.byKey("openai").key());
     assertEquals("OPENAI_API_KEY", ModelProviderRegistry.envVar("openai"));
-    assertNull(ModelProviderRegistry.byKey("openai-codex"), "a browser-login row is not offered");
+    // the ChatGPT-login row is its own key, never a spelling of the API-key one
+    assertEquals("openai-codex", ModelProviderRegistry.byKey("openai-codex").key());
     // and the Nous spellings collapse the same way through byKey
     assertEquals("nous", ModelProviderRegistry.byKey("nous-portal").key());
   }
