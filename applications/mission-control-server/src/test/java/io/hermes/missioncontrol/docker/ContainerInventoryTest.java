@@ -23,6 +23,7 @@ import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.InspectContainerCmd;
 import com.github.dockerjava.api.command.InspectContainerResponse.ContainerState;
 import com.github.dockerjava.api.command.InspectContainerResponse;
+import com.github.dockerjava.api.model.ContainerConfig;
 import com.github.dockerjava.api.command.ListContainersCmd;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Container;
@@ -437,6 +438,23 @@ class ContainerInventoryTest {
   }
 
   @Test
+  void anUnmanagedAgentWhoseTagMovedIsRecoveredFromTheReferenceItWasCreatedFrom() {
+    Container stray = container("bbbbbbb2222", "/stray", BARE_IMAGE_ID);
+    stubCreatedFrom("bbbbbbb2222", "hermes/image:v1");
+    Container foreign = container("ccccccc3333", "/foreign", BARE_IMAGE_ID);
+    stubCreatedFrom("ccccccc3333", "other/thing:latest");
+    stubListing(stray, foreign);
+
+    List<ContainerDto> fleet = subject.listContainers(HOST, false);
+
+    // the listing lost both references to a moved tag; inspect still holds what each was
+    // created from, so the Hermes one is an Agent and the other is an ordinary non-member
+    assertEquals(List.of("stray"), names(fleet));
+    assertEquals("hermes/image", fleet.get(0).image());
+    assertEquals("v1", fleet.get(0).version());
+  }
+
+  @Test
   void isImageIdReferenceRecognisesBothPrefixedAndBareDigests() {
     String hex = BARE_IMAGE_ID.substring("sha256:".length());
 
@@ -568,6 +586,16 @@ class ContainerInventoryTest {
     when(inspected.getState()).thenReturn(state);
     OngoingStubbing<String> stub = when(state.getStartedAt()).thenReturn(isos[0]);
     for (int i = 1; i < isos.length; i++) stub = stub.thenReturn(isos[i]);
+  }
+
+  private void stubCreatedFrom(String id, String reference) {
+    InspectContainerCmd inspect = mock(InspectContainerCmd.class);
+    InspectContainerResponse inspected = mock(InspectContainerResponse.class);
+    ContainerConfig config = mock(ContainerConfig.class);
+    when(client.inspectContainerCmd(id)).thenReturn(inspect);
+    when(inspect.exec()).thenReturn(inspected);
+    when(inspected.getConfig()).thenReturn(config);
+    when(config.getImage()).thenReturn(reference);
   }
 
   private void stubMissingOnInspect(String id) {
