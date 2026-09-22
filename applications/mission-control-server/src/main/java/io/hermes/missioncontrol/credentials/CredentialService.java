@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -144,6 +145,25 @@ public class CredentialService {
     if (!entry.secret()) return entry.value() == null ? "" : entry.value();
     assertRecoverable(credential, entry);
     return secrets.open(entry.value());
+  }
+
+  /**
+   * The first usable saved value for one variable, in the clear, or empty when no credential
+   * holds one it can open.
+   *
+   * <p>For a caller with no operator at hand to pick from the dropdown — the model-catalog
+   * refresh reads a keyed provider's list with whichever saved key fits, and any working one
+   * will do. The value goes to the provider's own API, never back to a browser.
+   */
+  public Optional<String> anyValueFor(String key) {
+    for (Credential credential : repository.findAll()) {
+      for (CredentialEntry entry : credential.entries()) {
+        if (!entry.key().equals(key) || entry.value() == null || entry.value().isBlank()) continue;
+        if (!entry.secret()) return Optional.of(entry.value());
+        if (secrets.isRecoverable(entry.value())) return Optional.of(secrets.open(entry.value()));
+      }
+    }
+    return Optional.empty();
   }
 
   /**

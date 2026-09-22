@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.hermes.missioncontrol.credentials.CredentialService;
 import io.hermes.missioncontrol.errors.ApiExceptionHandler;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -27,13 +28,15 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class ModelCatalogControllerTest {
 
   private ModelCatalogService catalog;
+  private CredentialService credentials;
   private MockMvc mvc;
 
   @BeforeEach
   void setUp() {
     catalog = mock(ModelCatalogService.class);
+    credentials = mock(CredentialService.class);
     mvc = MockMvcBuilders
-        .standaloneSetup(new ModelCatalogController(catalog))
+        .standaloneSetup(new ModelCatalogController(catalog, credentials))
         .setControllerAdvice(new ApiExceptionHandler())
         .build();
   }
@@ -82,6 +85,33 @@ class ModelCatalogControllerTest {
     ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
     verify(catalog).live(eq("anthropic"), key.capture());
     assertEquals("sk-ant-abcd", key.getValue());
+  }
+
+  @Test
+  void aSavedCredentialIsResolvedUnderTheProvidersOwnVariable() throws Exception {
+    // the dialog that picked a credential never holds the key, so it sends the id and the
+    // server reads the one variable this provider takes — not a key the client names
+    when(credentials.valueFor("cred-1", "OPENAI_API_KEY")).thenReturn("sk-from-store");
+    when(catalog.live(anyString(), anyString()))
+        .thenReturn(new ModelCatalogDto("openai-api", List.of("gpt-6"), "live"));
+
+    mvc.perform(post("/api/models/openai-api")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"credentialId\":\"cred-1\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.models[0]").value("gpt-6"));
+
+    verify(catalog).live("openai-api", "sk-from-store");
+  }
+
+  @Test
+  void aCredentialForAProviderThatTakesNoKeyIsABadRequest() throws Exception {
+    mvc.perform(post("/api/models/nous")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"credentialId\":\"cred-1\"}"))
+        .andExpect(status().isBadRequest());
+
+    verifyNoInteractions(catalog, credentials);
   }
 
   @Test

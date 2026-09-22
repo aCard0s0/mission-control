@@ -17,6 +17,7 @@ import io.hermes.missioncontrol.secrets.SecretCipher;
 import io.hermes.missioncontrol.secrets.SecretsAtRest;
 import io.hermes.missioncontrol.support.SqliteTestDatabase;
 import java.util.List;
+import java.util.Optional;
 import java.util.NoSuchElementException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -157,6 +158,20 @@ class CredentialServiceTest {
     assertEquals(List.of("TELEGRAM_BOT_TOKEN"),
         repository.find(saved.id()).orElseThrow().entries().stream()
             .map(CredentialEntry::key).toList());
+  }
+
+  @Test
+  void anyValueForAnswersTheFirstSavedKeyItCanOpen_andEmptyWhenNoneFits() {
+    // the model-catalog refresh borrows whichever saved key fits the provider's variable
+    assertEquals(Optional.empty(), service.anyValueFor("OPENAI_API_KEY"));
+    service.create(request("anthropic", secret("ANTHROPIC_API_KEY", "sk-ant")));
+    service.create(request("openai", secret("OPENAI_API_KEY", "sk-oai")));
+
+    assertEquals(Optional.of("sk-oai"), service.anyValueFor("OPENAI_API_KEY"));
+    assertEquals(Optional.empty(), service.anyValueFor("XAI_API_KEY"));
+    // an envelope this key cannot open is passed over, not thrown: the job has nobody to tell
+    assertEquals(Optional.empty(),
+        new CredentialService(repository, new SecretsAtRest(OTHER_KEY)).anyValueFor("OPENAI_API_KEY"));
   }
 
   @Test

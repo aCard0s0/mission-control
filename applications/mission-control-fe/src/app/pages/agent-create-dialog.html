@@ -25,11 +25,7 @@
         <div class="field">
           <label for="new-model">model @if (main.loading()) { <span class="faint">loading…</span> }
             @else if (main.sourceLabel()) { <span class="faint">{{ main.sourceLabel() }}</span> }</label>
-          <input id="new-model" class="input" [(ngModel)]="main.model" list="agent-model-list"
-                 placeholder="model id" autocomplete="off" />
-          <datalist id="agent-model-list">
-            @for (m of main.suggestions(); track m) { <option [value]="m"></option> }
-          </datalist>
+          <mc-model-field [picker]="main" controlId="new-model" />
         </div>
       </div>
       @if (provider === 'nous') {
@@ -66,8 +62,8 @@
                       (click)="refreshLive()">↻</button>
             </div>
           } @else {
-            <p class="lock-hint">taken from the saved credential on create — the model list
-              below cannot be refreshed live, because this page never holds the key.</p>
+            <p class="lock-hint">taken from the saved credential on create; the model list above
+              is refreshed through it, and its label says which list you are looking at.</p>
           }
         </div>
       }
@@ -90,17 +86,14 @@
           <div class="field">
             <label for="new-auxiliary-model">auxiliary model @if (aux.loading()) { <span class="faint">loading…</span> }
               @else if (aux.sourceLabel()) { <span class="faint">{{ aux.sourceLabel() }}</span> }</label>
-            <input id="new-auxiliary-model" class="input" [(ngModel)]="aux.model" list="agent-aux-model-list"
-                   placeholder="model id" autocomplete="off" />
-            <datalist id="agent-aux-model-list">
-              @for (m of aux.suggestions(); track m) { <option [value]="m"></option> }
-            </datalist>
+            <mc-model-field [picker]="aux" controlId="new-auxiliary-model" />
           </div>
         </div>
         @if (auxApiKeyRequired()) {
           <div class="field">
             <label for="new-auxiliary-api-key">auxiliary API key — stored in the profile's .env</label>
-            <input id="new-auxiliary-api-key" class="input" type="password" [(ngModel)]="auxApiKey" placeholder="sk-…" />
+            <input id="new-auxiliary-api-key" class="input" type="password" [(ngModel)]="auxApiKey" placeholder="sk-…"
+                 (blur)="refreshAuxLive()" />
           </div>
         }
       }

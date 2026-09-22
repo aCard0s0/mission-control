@@ -13,6 +13,7 @@ import { TemplateStore } from '../core/store/template-store';
 import {
   AuthProvider, AuxiliaryModel, Credential, HermesContainer, ModelCatalog,
 } from '../core/models';
+import { ModelField } from '../shared/model-field';
 import { ModelPicker, modelCatalogFor } from '../shared/model-picker';
 import {
   OLLAMA_PREFIX, providerOptions, providerOptionFor, resolveProviderOption, templateProvidesKey,
@@ -31,7 +32,7 @@ import { Scrim } from '../shared/scrim';
 @Component({
   selector: 'mc-agent-create-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, Scrim],
+  imports: [FormsModule, ModelField, Scrim],
   templateUrl: './agent-create-dialog.html',
   styleUrl: './agent-create-dialog.scss',
 })
@@ -144,16 +145,28 @@ export class AgentCreateDialog {
    *  prefers the id, so leaving a stale character on screen would misreport what was used. */
   protected onCredentialPick(id: string): void {
     this.apiKeyCredentialId = id;
-    if (id) this.apiKey = '';
+    if (id) { this.apiKey = ''; this.refreshLive(); }
   }
 
-  /** Live catalog refresh straight from the provider API, for a catalog-backed
-   *  provider the operator has just typed a key for. */
+  /** Live catalog refresh straight from the provider API, for a catalog-backed provider the
+   *  operator has just typed a key for — or picked a saved credential for, in which case the
+   *  server reads the key: this page never holds it. */
   protected refreshLive(): void {
-    const key = this.apiKey.trim();
-    if (!this.apiKeyRequired() || !key || !this.hasCatalog(this.provider)) return;
-    void this.main.load(
-      this.providers.modelCatalogLive(this.provider, key), { keepOnError: true });
+    if (!this.apiKeyRequired() || !this.hasCatalog(this.provider)) return;
+    const key = this.apiKeyCredentialId
+      ? { credentialId: this.apiKeyCredentialId }
+      : { apiKey: this.apiKey.trim() };
+    if (!key.credentialId && !key.apiKey) return;
+    void this.main.load(this.providers.modelCatalogLive(this.provider, key), { keepOnError: true });
+  }
+
+  /** The override's own key, once typed, reads its provider live too — same rule as the main
+   *  key, for the case where the side tasks go to a vendor the main model does not use. */
+  protected refreshAuxLive(): void {
+    const key = this.auxApiKey.trim();
+    if (!this.auxApiKeyRequired() || !key || !this.hasCatalog(this.auxProvider)) return;
+    void this.aux.load(
+      this.providers.modelCatalogLive(this.auxProvider, { apiKey: key }), { keepOnError: true });
   }
 
   /** Turning the override on starts it from the main provider, so the common case

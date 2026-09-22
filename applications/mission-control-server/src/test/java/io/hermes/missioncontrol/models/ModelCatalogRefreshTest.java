@@ -11,9 +11,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.hermes.missioncontrol.credentials.CredentialService;
 import java.net.http.HttpRequest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -31,9 +33,10 @@ class ModelCatalogRefreshTest {
 
   private final List<HttpRequest> sent = new ArrayList<>();
   private final ModelCatalogRepository repository = mock(ModelCatalogRepository.class);
+  private final CredentialService credentials = mock(CredentialService.class);
 
   private ModelCatalogService serviceAnswering(Function<HttpRequest, String> responder) {
-    return new ModelCatalogService(PROPS, repository, new ObjectMapper()) {
+    return new ModelCatalogService(PROPS, repository, credentials, new ObjectMapper()) {
       @Override
       String send(HttpRequest request) {
         sent.add(request);
@@ -52,10 +55,11 @@ class ModelCatalogRefreshTest {
   }
 
   @Test
-  void itReadsOnlyTheProvidersWhoseListNeedsNoKey() {
+  void itReadsTheProvidersWhoseListNeedsNoKey_andTheKeyedOnesItHasAFetcherFor() {
     // measured against each endpoint: everything else answers 401 or 403 unauthenticated,
-    // and this job holds no credential to offer them
+    // so the keyed ones are read only when a saved credential lends the job a key
     assertEquals(List.of("openrouter", "nvidia", "nous"), ModelCatalogService.PUBLIC_CATALOGS);
+    assertEquals(List.of("anthropic", "openai-api"), ModelCatalogService.KEYED_CATALOGS);
   }
 
   @Test
@@ -81,6 +85,33 @@ class ModelCatalogRefreshTest {
       assertTrue(request.headers().firstValue("x-api-key").isEmpty(),
           "nor an x-api-key: " + request.uri());
     }
+  }
+
+  @Test
+  void aKeyedProviderIsReadWithASavedCredentialsKey_andSkippedWithoutOne() {
+    // the operator saved an OpenAI key on the Credentials page; that is a key this job may
+    // borrow, so OpenAI's list stops being the one this app shipped with
+    when(credentials.anyValueFor("OPENAI_API_KEY")).thenReturn(Optional.of("sk-saved"));
+    when(credentials.anyValueFor("ANTHROPIC_API_KEY")).thenReturn(Optional.empty());
+    ModelCatalogService service = serviceAnswering(r -> models("gpt-6", "gpt-5.2"));
+
+    assertEquals(List.of("openrouter", "nvidia", "nous", "openai-api"), service.refreshAll());
+
+    HttpRequest openai = sent.stream()
+        .filter(r -> r.uri().getHost().equals("api.openai.com")).findFirst().orElseThrow();
+    assertEquals(Optional.of("Bearer sk-saved"), openai.headers().firstValue("Authorization"));
+    verify(repository).replace(eq("openai-api"), eq(List.of("gpt-6", "gpt-5.2")), anyLong());
+    assertTrue(sent.stream().noneMatch(r -> r.uri().getHost().equals("api.anthropic.com")),
+        "a keyed provider with no saved key is not asked — it would only answer 401");
+  }
+
+  @Test
+  void aSavedKeyThatCannotBeOpenedSkipsThatProviderRatherThanFailingTheJob() {
+    when(credentials.anyValueFor("OPENAI_API_KEY"))
+        .thenThrow(new IllegalStateException("cannot be decrypted (check MC_SECRET_KEY)"));
+    ModelCatalogService service = serviceAnswering(r -> models("a/one"));
+
+    assertEquals(List.of("openrouter", "nvidia", "nous"), service.refreshAll());
   }
 
   @Test

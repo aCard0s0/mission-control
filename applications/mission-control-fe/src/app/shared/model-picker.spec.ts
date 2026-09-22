@@ -14,6 +14,23 @@ const deferred = () => {
 };
 
 describe('ModelPicker', () => {
+  it('hands the field to free text on the empty "other…" pick, and back on the next load', async () => {
+    const picker = new ModelPicker();
+    await picker.load(Promise.resolve(cat(['claude-opus-5'])));
+
+    picker.pick('');
+    expect(picker.custom()).toBe(true);
+    expect(picker.model).toBe('');
+
+    picker.pick('claude-opus-5');
+    expect(picker.model).toBe('claude-opus-5');
+
+    picker.custom.set(true);
+    await picker.load(Promise.resolve(cat(['claude-sonnet-5'])));
+    // a new list is a new set of choices; the typed one is re-checked against it
+    expect(picker.custom()).toBe(false);
+  });
+
   it('lists what the catalog answered and selects the first of them', async () => {
     const picker = new ModelPicker();
 

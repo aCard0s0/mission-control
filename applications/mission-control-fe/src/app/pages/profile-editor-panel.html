@@ -60,11 +60,7 @@
       <div class="field">
         <label for="bp-model">model @if (picker.loading()) { <span class="faint">loading…</span> }
           @else if (picker.sourceLabel()) { <span class="faint">{{ picker.sourceLabel() }}</span> }</label>
-        <input id="bp-model" class="input" [(ngModel)]="picker.model" list="bp-model-list"
-               placeholder="model id" autocomplete="off" />
-        <datalist id="bp-model-list">
-          @for (m of picker.suggestions(); track m) { <option [value]="m"></option> }
-        </datalist>
+        <mc-model-field [picker]="picker" controlId="bp-model" />
       </div>
     </div>
 

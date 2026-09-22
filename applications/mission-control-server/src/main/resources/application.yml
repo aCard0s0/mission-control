@@ -102,9 +102,10 @@ mc:
   model-catalog:
     refresh: ${MC_MODEL_CATALOG_REFRESH:true}
   models:
-    # Seeds and fallbacks. Once the background refresh has read a provider, its
-    # stored list is what the picker offers and these are only what it starts from
-    # — or falls back to for a provider that needs a key (Anthropic, OpenAI).
+    # Seeds and fallbacks. Once a provider has been read — by the background refresh,
+    # which also uses a saved credential for Anthropic and OpenAI when one exists, or by
+    # an operator typing a key into the picker — its stored list is what the picker
+    # offers, and these are only what it starts from.
     #
     # Written here rather than behind MC_MODELS_* placeholders: a seed list the refresh
     # replaces on first contact is not something anyone deploys an override for, and five

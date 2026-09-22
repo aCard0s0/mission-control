@@ -8,7 +8,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Re-reads the keyless providers' model lists twice a day.
+ * Re-reads the keyless providers' model lists twice a day — and the keyed ones' too, for
+ * every provider a saved credential holds a key for.
  *
  * <p>The picker used to offer a list authored into {@code application.yml}. Every model a
  * vendor shipped after this app's last release was therefore missing from it, and nothing
@@ -48,7 +49,7 @@ public class ModelCatalogRefresher {
     List<String> refreshed = catalog.refreshAll();
     if (refreshed.isEmpty()) {
       // every one of them failing at once is a network story, not a provider story
-      log.warn("model catalog refresh updated nothing — every keyless provider was unreadable");
+      log.warn("model catalog refresh updated nothing — every provider was unreadable");
     } else {
       log.info("model catalog refresh updated {}", refreshed);
     }

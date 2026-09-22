@@ -1,4 +1,4 @@
-import { ApiModelCatalog, ApiModelProvider } from './api-types';
+import { ApiLiveModelsRequest, ApiModelCatalog, ApiModelProvider } from './api-types';
 import { ApiHttp, seg } from './http';
 
 /**
@@ -21,8 +21,8 @@ export class ProvidersApi {
     return this.http.get(`/api/models/${seg(provider)}`);
   }
 
-  /** Reads the catalog straight from the provider API using a caller-held key. */
-  modelCatalogLive(provider: string, apiKey: string): Promise<ApiModelCatalog> {
-    return this.http.post(`/api/models/${seg(provider)}`, { apiKey });
+  /** Reads the catalog straight from the provider API, with a typed key or a saved credential. */
+  modelCatalogLive(provider: string, key: ApiLiveModelsRequest): Promise<ApiModelCatalog> {
+    return this.http.post(`/api/models/${seg(provider)}`, key);
   }
 }

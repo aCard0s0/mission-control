@@ -51,6 +51,10 @@ export class ModelPicker {
   /** Where the current suggestions came from; null before the first load. */
   readonly source = signal<ModelSource | null>(null);
 
+  /** True while the operator has chosen to type a model the list does not offer. Cleared by
+   *  every load: a new list is a new set of choices, and the typed one is re-checked against it. */
+  readonly custom = signal(false);
+
   /** The provenance as a field hint, or null when there is nothing worth saying — an empty
    *  list has no source to report, a failed read has none either, and `live` means the
    *  operator's own key just answered, which they already know because they typed it. */
@@ -90,9 +94,23 @@ export class ModelPicker {
     if (seq !== this.seq) return;   // a newer load superseded this one
     this.suggestions.set(list);
     this.source.set(source);
+    this.custom.set(false);
     this.loading.set(false);
     if (opts.preferred) this.model = opts.preferred;
     else if (list.length && !list.includes(this.model)) this.model = list[0];
+  }
+
+  /** A dropdown choice. The empty entry is "other…": it hands the field over to free text. */
+  pick(value: string): void {
+    this.model = value;
+    if (!value) this.custom.set(true);
+  }
+
+  /** Back from free text to the dropdown. An empty field takes the first suggestion, so the
+   *  list does not come back sitting on the "other…" entry the operator just left. */
+  backToList(): void {
+    this.custom.set(false);
+    if (!this.model) this.model = this.suggestions()[0] ?? '';
   }
 
   /** Drops the selection and the suggestions, and abandons any load in flight. */
@@ -101,6 +119,7 @@ export class ModelPicker {
     this.model = '';
     this.suggestions.set([]);
     this.source.set(null);
+    this.custom.set(false);
     this.loading.set(false);
   }
 }

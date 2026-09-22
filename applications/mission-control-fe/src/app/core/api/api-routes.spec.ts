@@ -268,7 +268,7 @@ const cases: Record<string, Case> = {
     call: a => a.providers.modelCatalog('anthropic'), method: 'GET', url: '/api/models/anthropic',
   },
   'providers.modelCatalogLive': {
-    call: a => a.providers.modelCatalogLive('anthropic', 'sk-x'), method: 'POST',
+    call: a => a.providers.modelCatalogLive('anthropic', { apiKey: 'sk-x' }), method: 'POST',
     url: '/api/models/anthropic', body: { apiKey: 'sk-x' },
   },
   'endpoints.list': { call: a => a.endpoints.list(), method: 'GET', url: '/api/inference-endpoints' },

@@ -51,9 +51,9 @@ describe('ProviderStore models', () => {
     const modelCatalogLive = vi.fn().mockResolvedValue({ models: ['live-1'], source: 'live' });
     const built = store({ modelCatalogLive });
 
-    expect(await built.store.modelCatalogLive('anthropic', 'sk-x'))
+    expect(await built.store.modelCatalogLive('anthropic', { apiKey: 'sk-x' }))
       .toEqual({ models: ['live-1'], source: 'live' });
-    expect(modelCatalogLive).toHaveBeenCalledWith('anthropic', 'sk-x');
+    expect(modelCatalogLive).toHaveBeenCalledWith('anthropic', { apiKey: 'sk-x' });
   });
 
   it('falls back to the configured catalog when the key is rejected', async () => {
@@ -62,7 +62,7 @@ describe('ProviderStore models', () => {
       modelCatalog: vi.fn().mockResolvedValue({ models: ['configured'], source: 'config' }),
     });
 
-    expect(await built.store.modelCatalogLive('anthropic', 'bad-key'))
+    expect(await built.store.modelCatalogLive('anthropic', { apiKey: 'bad-key' }))
       .toEqual({ models: ['configured'], source: 'config' });
   });
 });
