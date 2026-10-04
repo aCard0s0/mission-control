@@ -113,6 +113,16 @@ describe('AgentCreateDialog opening', () => {
     expect(store.setup.authProviders).not.toHaveBeenCalled();
   });
 
+  it('asks once, not again each time the stats poll hands it a fresh copy of the container', async () => {
+    const { fixture, store, host } = await render(storeStub());
+
+    host.container = { ...container, cpu: 42 };
+    fixture.detectChanges();
+    await settle(fixture);
+
+    expect(store.setup.authProviders).toHaveBeenCalledTimes(1);
+  });
+
   it('loads the default provider\'s catalog and this container\'s auth status', async () => {
     const { fixture, store } = await render(storeStub());
 
