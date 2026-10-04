@@ -92,15 +92,24 @@ export class AgentCreateDialog {
   // terminal, once per container, and every profile in it shares the result.
   private readonly authProviders = signal<AuthProvider[]>([]);
 
+  /** The container to ask for its logins, or null when it is stopped — a stopped container
+   *  cannot be asked, and the call is a 409 and a console error for nothing. A string rather
+   *  than the container: the stats poll hands the input a fresh copy every three seconds, and
+   *  each ask runs `hermes status` and `hermes auth list` inside the container. Keyed on the
+   *  object, an open dialog started both every tick until a 2 GB container ran out of memory. */
+  private readonly authTarget = computed(() => {
+    const container = this.container();
+    return container.status === 'stopped' ? null : container.id;
+  });
+
   constructor() {
     inject(DestroyRef).onDestroy(() => { this.gone = true; });
     void this.main.load(this.catalogFor(this.provider));
     // the container arrives with the input, which is bound after construction
     effect(() => {
-      const container = this.container();
-      // a stopped container cannot be asked — the call is a 409 and a console error for nothing
-      if (container.status === 'stopped') { this.authProviders.set([]); return; }
-      untracked(() => void this.loadAuthProviders(container.id));
+      const containerId = this.authTarget();
+      if (containerId === null) { this.authProviders.set([]); return; }
+      untracked(() => void this.loadAuthProviders(containerId));
     });
   }
 
