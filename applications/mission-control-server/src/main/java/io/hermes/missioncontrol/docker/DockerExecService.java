@@ -11,6 +11,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,9 @@ public class DockerExecService {
    * {@code dirExists}) read "no" rather than "yes" when the answer is unknown.
    */
   public static final int EXIT_STATUS_UNAVAILABLE = -1;
+
+  /** How long past the caller's wait a command may run — see {@link #boundedInContainer}. */
+  private static final int KILL_GRACE_SECONDS = 5;
 
   private final DockerClients clients;
 
@@ -89,7 +93,7 @@ public class DockerExecService {
           .withAttachStdout(true)
           .withAttachStderr(true)
           .withAttachStdin(stdin != null)
-          .withCmd(command.toArray(new String[0]));
+          .withCmd(boundedInContainer(command, timeout));
       if (user != null && !user.isBlank()) create.withUser(user);
       exec = create.exec();
     } catch (ConflictException notRunning) {
@@ -163,6 +167,25 @@ public class DockerExecService {
       throw commandFailure(operation, exitCode, sensitive, out, err);
     }
     return new ExecResult(exitCode, out, err);
+  }
+
+  /**
+   * {@code command} behind coreutils {@code timeout}, so the container stops it once we stop
+   * waiting. The daemon has no call that cancels an exec: a command we gave up on ran to the
+   * end, and a poll that kept timing out kept adding one more. A create dialog asking for
+   * {@code hermes status} every three seconds left a 2 GB container running over a hundred of
+   * them, OOM-killing at random, and its {@code hermes profile create} timed out behind them.
+   *
+   * <p>A few seconds past the wait, so the caller still reads "timed out" rather than the exit
+   * code {@code timeout} answers with; {@code -k} follows with SIGKILL for a command that
+   * ignores the TERM. Every exec here targets a Hermes image, which ships GNU coreutils.
+   */
+  static String[] boundedInContainer(List<String> command, Duration timeout) {
+    String grace = String.valueOf(KILL_GRACE_SECONDS);
+    String limit = String.valueOf(Math.max(1, timeout.toSeconds()) + KILL_GRACE_SECONDS);
+    List<String> argv = new ArrayList<>(List.of("timeout", "-k", grace, limit));
+    argv.addAll(command);
+    return argv.toArray(new String[0]);
   }
 
   /** True for a failure that is the connection breaking rather than a defect in this code. */

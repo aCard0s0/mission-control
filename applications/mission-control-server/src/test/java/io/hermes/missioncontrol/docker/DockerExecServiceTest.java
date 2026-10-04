@@ -92,6 +92,18 @@ class DockerExecServiceTest {
   }
 
   @Test
+  void theContainerStopsACommandShortlyAfterTheWaitForItEnds() {
+    DockerClients clients = stubbedClients(0);
+
+    new DockerExecService(clients).runAsUser(
+        HOST, "cid", "hermes", List.of("hermes", "status"), "read status",
+        true, false, Duration.ofSeconds(30));
+
+    // the daemon cannot cancel an exec: without the bound, a command nobody waits for runs on
+    verify(create).withCmd("timeout", "-k", "5", "35", "hermes", "status");
+  }
+
+  @Test
   void theSixArgumentOverloadRunsWithTheDaemonDefaultUser() {
     DockerClients clients = stubbedClients(0);
 
