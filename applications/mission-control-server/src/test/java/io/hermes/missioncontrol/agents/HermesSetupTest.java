@@ -288,14 +288,29 @@ class HermesSetupTest {
     setup.setup(HOST, CONTAINER, "scout");
 
     org.mockito.Mockito.verify(files)
-        .exec(HOST, CONTAINER, List.of("hermes", "-p", "scout", "status"));
+        .exec(HOST, CONTAINER, List.of("hermes", "-p", "scout", "status", "--full"));
+  }
+
+  @Test
+  void aHermesWithoutTheFullFlagIsAskedForPlainStatus() {
+    statusOutput("""
+        ◆ Auth Providers
+          Nous Portal   ✓ logged in
+        """);
+    when(files.exec(any(), anyString(), argThat(cmd -> cmd != null && cmd.contains("--full"))))
+        .thenThrow(new RuntimeException("unrecognized arguments: --full"));
+
+    AgentSetupDto dto = run();
+
+    org.mockito.Mockito.verify(files).exec(HOST, CONTAINER, List.of("hermes", "status"));
+    assertFalse(dto.authProviders().isEmpty());
   }
 
   @Test
   void theDefaultProfileOmitsTheProfileFlag() {
     run();
 
-    org.mockito.Mockito.verify(files).exec(HOST, CONTAINER, List.of("hermes", "status"));
+    org.mockito.Mockito.verify(files).exec(HOST, CONTAINER, List.of("hermes", "status", "--full"));
   }
 
   @Test

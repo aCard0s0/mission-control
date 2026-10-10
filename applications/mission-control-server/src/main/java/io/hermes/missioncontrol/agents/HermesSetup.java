@@ -142,9 +142,18 @@ public class HermesSetup {
   /** Degrades to null when `hermes status` cannot run — callers then report
    *  from the .env alone. */
   private StatusReport runStatus(DockerHostRef host, String containerId, String name) {
-    List<String> command = ProfilePaths.hermesCli(name, "status");
+    // since 2026.9.24 (v0.21.6) plain `hermes status` is a one-screen summary with no
+    // provider sections; `--full` restores them. Older hermes rejects the flag (argparse,
+    // exit 2) and prints every section without it, so fall back to the bare command.
     try {
-      return parseStatus(files.exec(host, containerId, command).stdout());
+      return parseStatus(
+          files.exec(host, containerId, ProfilePaths.hermesCli(name, "status", "--full")).stdout());
+    } catch (RuntimeException noFullFlag) {
+      log.debug("`hermes status --full` failed for profile {} in {}; retrying without the flag: {}",
+          name, containerId, noFullFlag.toString());
+    }
+    try {
+      return parseStatus(files.exec(host, containerId, ProfilePaths.hermesCli(name, "status")).stdout());
     } catch (RuntimeException e) {
       // degrading to the .env alone makes every externally-configured provider look
       // unconfigured, which is indistinguishable from "not set up" without this line
