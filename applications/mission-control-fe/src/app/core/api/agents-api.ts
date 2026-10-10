@@ -1,5 +1,5 @@
 import {
-  ApiAgentProfile, ApiAgentSetup, ApiAuxiliaryModel, ApiChatMessage, ApiContainerActivity,
+  ApiAgentProfile, ApiAgentSetup, ApiAuxiliaryModel, ApiChatMessage, ApiCodexLogin, ApiContainerActivity,
   ApiIntegration, ApiLogLine, ApiSession, ApiSetupAuthProvider,
 } from './api-types';
 import { AgentCronApi } from './agent-cron-api';
@@ -126,5 +126,15 @@ export class AgentsApi {
    *  default profile — usable before any agent exists, for the create modal. */
   authProviders(hostId: string, containerId: string): Promise<ApiSetupAuthProvider[]> {
     return this.http.get(`/api/agents/${seg(hostId)}/${seg(containerId)}/auth-providers`);
+  }
+
+  /** Starts the container's ChatGPT device login; waits until hermes prints its code. */
+  startCodexLogin(hostId: string, containerId: string): Promise<ApiCodexLogin> {
+    return this.http.post(
+      `/api/agents/${seg(hostId)}/${seg(containerId)}/codex-login`, undefined, CONTAINER_WRITE_TIMEOUT_MS);
+  }
+
+  codexLogin(hostId: string, containerId: string): Promise<ApiCodexLogin> {
+    return this.http.get(`/api/agents/${seg(hostId)}/${seg(containerId)}/codex-login`);
   }
 }

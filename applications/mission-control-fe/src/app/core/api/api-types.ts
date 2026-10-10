@@ -557,6 +557,15 @@ export interface ApiSetupAuthProvider {
   providerKey: string | null;     // the /api/providers key this login serves, if the picker has one
 }
 
+/** A container's ChatGPT (OpenAI Codex) device login. `url` and `code` are set while
+ *  `pending`; `message` is hermes' last line when it `failed`. */
+export interface ApiCodexLogin {
+  state: 'none' | 'pending' | 'succeeded' | 'failed';
+  url: string | null;
+  code: string | null;
+  message: string | null;
+}
+
 export interface ApiModelProvider {
   key: string;
   label: string;

@@ -9,6 +9,7 @@ import io.hermes.missioncontrol.agents.api.AgentSetupDto;
 import io.hermes.missioncontrol.agents.api.ApiKeyProviderDto;
 import io.hermes.missioncontrol.agents.api.ApiKeyStatusDto;
 import io.hermes.missioncontrol.agents.api.AuthProviderDto;
+import io.hermes.missioncontrol.agents.api.CodexLoginDto;
 import io.hermes.missioncontrol.agents.api.CronJobDto;
 import io.hermes.missioncontrol.agents.api.DeployedPart;
 import io.hermes.missioncontrol.agents.api.CronJobsDto;
@@ -131,6 +132,7 @@ class ApiContractTest {
     CONTRACT.put("ApiAgentSetup", AgentSetupDto.class);
     CONTRACT.put("ApiSetupApiKey", ApiKeyStatusDto.class);
     CONTRACT.put("ApiSetupAuthProvider", AuthProviderDto.class);
+    CONTRACT.put("ApiCodexLogin", CodexLoginDto.class);
     CONTRACT.put("ApiSetupKeyProvider", ApiKeyProviderDto.class);
     CONTRACT.put("ApiSetupMessaging", MessagingStatusDto.class);
     CONTRACT.put("ApiModelProvider", ProviderOptionDto.class);

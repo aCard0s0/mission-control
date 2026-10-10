@@ -354,4 +354,42 @@ describe('AgentSetupPanel', () => {
     expect(el(fixture).textContent).toContain('running hermes status…');
     expect(buttonWith(fixture, 'refresh').disabled).toBe(true);
   });
+
+  it('starts the ChatGPT login, shows its code, and re-reads the setup once it succeeds', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = storeStub();
+      store.cache.set({ 'a-atlas': setupFor('a-atlas', {
+        authProviders: [{ label: 'OpenAI Codex', ok: false, status: 'not logged in', hint: 'hermes model', providerKey: 'openai-codex' }],
+      }) });
+      const pending = { state: 'pending', url: 'https://auth.openai.com/codex/device', code: 'OY4P-34AG8', message: null };
+      Object.assign(store.setup, {
+        startCodexLogin: vi.fn(() => Promise.resolve(pending)),
+        codexLogin: vi.fn()
+          .mockResolvedValueOnce(pending)
+          .mockResolvedValueOnce({ state: 'succeeded', url: null, code: null, message: null }),
+      });
+      const fixture = render(store);
+      await vi.advanceTimersByTimeAsync(0);
+      fixture.detectChanges();
+
+      buttonWith(fixture, 'log in with ChatGPT').click();
+      await vi.advanceTimersByTimeAsync(0);
+      fixture.detectChanges();
+      expect(el(fixture).textContent).toContain('OY4P-34AG8');
+
+      await vi.advanceTimersByTimeAsync(3_000);
+      fixture.detectChanges();
+      await vi.advanceTimersByTimeAsync(3_000);
+      fixture.detectChanges();
+
+      expect(el(fixture).textContent).toContain('ChatGPT login saved');
+      expect(store.setup.reads.at(-1)).toEqual({ id: 'a-atlas', force: true });
+      await vi.advanceTimersByTimeAsync(6_000);
+      expect((store.setup as unknown as { codexLogin: ReturnType<typeof vi.fn> }).codexLogin)
+        .toHaveBeenCalledTimes(2);   // polling stopped once hermes settled it
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

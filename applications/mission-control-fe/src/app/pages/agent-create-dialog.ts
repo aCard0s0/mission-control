@@ -88,8 +88,8 @@ export class AgentCreateDialog {
   protected readonly aux = new ModelPicker();
 
   // The container's OAuth logins, as `hermes status` reports them. An OAuth provider is
-  // authenticated out of band — `hermes portal`, `hermes auth add openai-codex` — in the web
-  // terminal, once per container, and every profile in it shares the result.
+  // authenticated out of band — `hermes portal` in the web terminal, or the Setup tab's ChatGPT
+  // login for `openai-codex` — once per container, and every profile in it shares the result.
   private readonly authProviders = signal<AuthProvider[]>([]);
 
   /** The container to ask for its logins, or null when it is stopped — a stopped container
