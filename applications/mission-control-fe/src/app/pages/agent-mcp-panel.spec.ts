@@ -196,6 +196,25 @@ describe('AgentMcpPanel add form', () => {
       'a-1', 'github', 'github-enterprise', 'http',
       { url: 'https://github.example.test/mcp' });
   });
+
+  it('sends one connection header, and only once both halves are filled', async () => {
+    const agent = profile([]);
+    const store = storeStub(agent);
+    const fixture = render(store, agent);
+
+    await type(fixture, '.name-in', 'todos');
+    await type(fixture, '.url-in', 'http://host.docker.internal:3000/mcp');
+    await type(fixture, '.header-name-in', 'Authorization');
+    expect(submitAdd(fixture).disabled).toBe(true);   // a name without a value is not a header
+
+    await type(fixture, '.header-value-in', ' Bearer abc ');
+    submitAdd(fixture).click();
+    await fixture.whenStable();
+
+    expect(store.agentMcp.add).toHaveBeenCalledWith('a-1', 'todos', 'http', {
+      url: 'http://host.docker.internal:3000/mcp', headers: { Authorization: 'Bearer abc' },
+    });
+  });
 });
 
 describe('AgentMcpPanel catalog connect', () => {

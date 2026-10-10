@@ -6,6 +6,8 @@ export interface McpEndpointOptions {
   url?: string;
   command?: string;
   args?: string;
+  /** http/sse only; absent means "leave the profile's headers as they are". */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -22,6 +24,10 @@ export class McpEndpointForm {
   url = '';
   command = '';
   args = '';
+  /** One optional connection header, e.g. `Authorization: Bearer …`. Write-only: the
+   *  profile never hands a header value back, so editing starts with both blank. */
+  headerName = '';
+  headerValue = '';
 
   constructor(private readonly defaultTransport: McpTransport = 'http') {
     this.transport = defaultTransport;
@@ -34,6 +40,7 @@ export class McpEndpointForm {
   /** True once the submit button should be enabled. */
   valid(): boolean {
     if (!this.name.trim()) return false;
+    if (!this.stdio && !this.headerName.trim() !== !this.headerValue.trim()) return false;
     return this.stdio ? !!this.command.trim() : !!this.url.trim();
   }
 
@@ -42,7 +49,13 @@ export class McpEndpointForm {
     if (!this.valid()) return null;
     return this.stdio
       ? { command: this.command.trim(), args: this.args.trim() || undefined }
-      : { url: this.url.trim() };
+      : { url: this.url.trim(), ...this.headers() };
+  }
+
+  private headers(): Pick<McpEndpointOptions, 'headers'> {
+    const name = this.headerName.trim();
+    const value = this.headerValue.trim();
+    return name && value ? { headers: { [name]: value } } : {};
   }
 
   trimmedName(): string {
@@ -56,6 +69,8 @@ export class McpEndpointForm {
     this.url = server.url ?? '';
     this.command = server.command ?? '';
     this.args = server.args ?? '';
+    this.headerName = '';
+    this.headerValue = '';
   }
 
   reset(): void {
@@ -64,5 +79,7 @@ export class McpEndpointForm {
     this.url = '';
     this.command = '';
     this.args = '';
+    this.headerName = '';
+    this.headerValue = '';
   }
 }

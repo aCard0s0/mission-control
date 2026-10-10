@@ -20,6 +20,8 @@
   .name-in { flex: 0 0 180px; }
   .transport-in { flex: 0 0 110px; }
   .url-in, .cmd-in { flex: 1 1 200px; min-width: 160px; }
+  .header-name-in { flex: 0 0 160px; }
+  .header-value-in { flex: 1 1 160px; min-width: 140px; }
   .args-in { flex: 2 1 240px; min-width: 160px; }
   .btn { flex: none; }
 }
@@ -33,6 +35,6 @@
 
 @media (max-width: 760px) {
   .mcp-row { flex-wrap: wrap; row-gap: 6px; padding: 10px 0; }
-  .mcp-add { .name-in, .transport-in, .url-in, .cmd-in, .args-in { flex: 1 1 100%; } }
+  .mcp-add { .name-in, .transport-in, .url-in, .cmd-in, .args-in, .header-name-in, .header-value-in { flex: 1 1 100%; } }
   .catalog-connect { grid-template-columns: 1fr; }
 }

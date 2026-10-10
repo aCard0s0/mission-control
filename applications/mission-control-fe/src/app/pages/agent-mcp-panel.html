@@ -53,6 +53,11 @@
         <input class="input args-in" [(ngModel)]="form.args" placeholder="args e.g. @modelcontextprotocol/server-github" />
       } @else {
         <input class="input url-in" [(ngModel)]="form.url" placeholder="url e.g. https://mcp.example.com" />
+        <input class="input header-name-in" [(ngModel)]="form.headerName" placeholder="header e.g. Authorization"
+               aria-label="header name" />
+        <input class="input header-value-in" type="password" autocomplete="off" [(ngModel)]="form.headerValue"
+               [placeholder]="editingMcp() ? 'header value — blank keeps current' : 'header value e.g. Bearer …'"
+               aria-label="header value" />
       }
       <button class="btn primary" [disabled]="!form.valid()" (click)="saveMcp()">
         {{ editingMcp() ? 'update' : 'connect' }}
