@@ -197,23 +197,79 @@ describe('AgentMcpPanel add form', () => {
       { url: 'https://github.example.test/mcp' });
   });
 
-  it('sends one connection header, and only once both halves are filled', async () => {
+  it('sends several connection headers, and only once each row is complete', async () => {
     const agent = profile([]);
     const store = storeStub(agent);
     const fixture = render(store, agent);
 
     await type(fixture, '.name-in', 'todos');
     await type(fixture, '.url-in', 'http://host.docker.internal:3000/mcp');
+    buttonWith(fixture, '+ header').click();
+    fixture.detectChanges();
     await type(fixture, '.header-name-in', 'Authorization');
     expect(submitAdd(fixture).disabled).toBe(true);   // a name without a value is not a header
 
     await type(fixture, '.header-value-in', ' Bearer abc ');
+    buttonWith(fixture, '+ header').click();
+    fixture.detectChanges();
+    await type(fixture, '.kv-row + .kv-row .header-name-in', 'X-Tenant');
+    await type(fixture, '.kv-row + .kv-row .header-value-in', 'acme');
     submitAdd(fixture).click();
     await fixture.whenStable();
 
     expect(store.agentMcp.add).toHaveBeenCalledWith('a-1', 'todos', 'http', {
-      url: 'http://host.docker.internal:3000/mcp', headers: { Authorization: 'Bearer abc' },
+      url: 'http://host.docker.internal:3000/mcp',
+      headers: { Authorization: 'Bearer abc', 'X-Tenant': 'acme' },
     });
+  });
+
+  it('shows a header value as typed until it is marked secret', async () => {
+    const agent = profile([]);
+    const fixture = render(storeStub(agent), agent);
+
+    buttonWith(fixture, '+ header').click();
+    fixture.detectChanges();
+    const value = () => el(fixture).querySelector<HTMLInputElement>('.header-value-in')!;
+    expect(value().type).toBe('text');
+
+    el(fixture).querySelector<HTMLInputElement>('.secret-toggle input')!.click();
+    fixture.detectChanges();
+    expect(value().type).toBe('password');
+  });
+
+  it('removes a header row, and offers none for stdio', async () => {
+    const agent = profile([]);
+    const fixture = render(storeStub(agent), agent);
+
+    buttonWith(fixture, '+ header').click();
+    fixture.detectChanges();
+    buttonWith(fixture, 'remove').click();
+    fixture.detectChanges();
+    expect(el(fixture).querySelectorAll('.kv-row')).toHaveLength(0);
+
+    const transport = el(fixture).querySelector<HTMLSelectElement>('.transport-in')!;
+    transport.value = 'stdio';
+    transport.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el(fixture).textContent).not.toContain('+ header');
+  });
+
+  it('leaves a server\'s stored headers alone when editing adds none', async () => {
+    const agent = profile([server('github')]);
+    const store = storeStub(agent);
+    const fixture = render(store, agent);
+    await fixture.whenStable();
+
+    buttonWith(fixture, 'edit').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el(fixture).textContent).toContain('stored header values are never shown');
+    submitAdd(fixture).click();
+    await fixture.whenStable();
+
+    expect(store.agentMcp.update).toHaveBeenCalledWith(
+      'a-1', 'github', 'github', 'http', { url: 'https://github.example.test/mcp' });
   });
 });
 

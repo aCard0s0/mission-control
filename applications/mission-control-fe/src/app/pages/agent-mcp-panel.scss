@@ -11,19 +11,39 @@
   .name { font-weight: 600; min-width: 110px; }
 }
 
+// The add / edit form lays out like the catalog entry editor (mcp-server-editor.scss), whose
+// kv rows these mirror. `.field` is global; the rest is local to each of the two forms.
 .mcp-add {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 12px;
 
-  .name-in { flex: 0 0 180px; }
-  .transport-in { flex: 0 0 110px; }
-  .url-in, .cmd-in { flex: 1 1 200px; min-width: 160px; }
-  .header-name-in { flex: 0 0 160px; }
-  .header-value-in { flex: 1 1 160px; min-width: 140px; }
-  .args-in { flex: 2 1 240px; min-width: 160px; }
-  .btn { flex: none; }
+  .form-grid { display: grid; gap: 12px; }
+  .form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .section-label { color: var(--faint); font-size: 9.5px; letter-spacing: .14em; }
+  .kv-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 4px;
+    border-top: 1px solid var(--line);
+  }
+  .kv-row {
+    display: grid;
+    grid-template-columns: minmax(140px, .8fr) minmax(180px, 1.3fr) auto auto;
+    align-items: center;
+    gap: 8px;
+  }
+  .secret-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--dim);
+    font-size: 10px;
+    white-space: nowrap;
+    input { accent-color: var(--acc); }
+  }
+  .actions { display: flex; justify-content: flex-end; gap: 10px; }
 }
 
 .catalog-connect {
@@ -35,6 +55,10 @@
 
 @media (max-width: 760px) {
   .mcp-row { flex-wrap: wrap; row-gap: 6px; padding: 10px 0; }
-  .mcp-add { .name-in, .transport-in, .url-in, .cmd-in, .args-in, .header-name-in, .header-value-in { flex: 1 1 100%; } }
+  .mcp-add {
+    .form-grid.two { grid-template-columns: 1fr; }
+    .kv-row { grid-template-columns: 1fr auto; }
+    .kv-row .input:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  }
   .catalog-connect { grid-template-columns: 1fr; }
 }

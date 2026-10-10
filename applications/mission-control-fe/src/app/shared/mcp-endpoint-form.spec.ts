@@ -33,13 +33,33 @@ describe('McpEndpointForm endpoint', () => {
       .toEqual({ command: 'npx', args: undefined });
   });
 
-  it('adds a header only when both its name and value are filled, and never for stdio', () => {
-    expect(filled({ headerName: ' Authorization ', headerValue: ' Bearer t ' }).endpoint())
-      .toEqual({ url: 'https://mcp.example.test/mcp', headers: { Authorization: 'Bearer t' } });
-    expect(filled({ headerName: 'Authorization' }).valid()).toBe(false);
-    expect(filled({ headerValue: 'Bearer t' }).valid()).toBe(false);
-    expect(filled({ transport: 'stdio', command: 'npx', headerName: 'X', headerValue: 'y' }).endpoint())
-      .toEqual({ command: 'npx', args: undefined });
+  it('sends every header whose name and value are both filled, trimmed', () => {
+    const headers = [
+      { name: ' Authorization ', value: ' Bearer t ', secret: false },
+      { name: 'X-Tenant', value: 'acme', secret: true },
+      { name: '  ', value: '', secret: false },        // an untouched row is just ignored
+    ];
+    expect(filled({ headers }).endpoint()).toEqual({
+      url: 'https://mcp.example.test/mcp',
+      headers: { Authorization: 'Bearer t', 'X-Tenant': 'acme' },
+    });
+  });
+
+  it('rejects a header row with only one half filled, and drops headers for stdio', () => {
+    expect(filled({ headers: [{ name: 'Authorization', value: '', secret: false }] }).valid()).toBe(false);
+    expect(filled({ headers: [{ name: '', value: 'Bearer t', secret: false }] }).valid()).toBe(false);
+    expect(filled({
+      transport: 'stdio', command: 'npx', headers: [{ name: 'X', value: 'y', secret: false }],
+    }).endpoint()).toEqual({ command: 'npx', args: undefined });
+  });
+
+  it('adds and removes header rows, a new one showing its value', () => {
+    const form = filled();
+    form.addHeader();
+    form.addHeader();
+    form.headers[0].name = 'A';
+    form.removeHeader(1);
+    expect(form.headers).toEqual([{ name: 'A', value: '', secret: false }]);
   });
 
   it('answers null rather than a half-built endpoint', () => {
@@ -50,11 +70,11 @@ describe('McpEndpointForm endpoint', () => {
 
 describe('McpEndpointForm load and reset', () => {
   it('loads an existing server, blanking the fields it does not carry', () => {
-    const form = filled();
+    const form = filled({ headers: [{ name: 'Authorization', value: 'Bearer t', secret: false }] });
     form.load({ name: 'local', transport: 'stdio', command: 'npx', args: '-y @acme/server' });
 
     expect(form).toMatchObject({
-      name: 'local', transport: 'stdio', command: 'npx', args: '-y @acme/server', url: '',
+      name: 'local', transport: 'stdio', command: 'npx', args: '-y @acme/server', url: '', headers: [],
     });
   });
 
@@ -64,7 +84,7 @@ describe('McpEndpointForm load and reset', () => {
     form.reset();
 
     expect(form).toMatchObject({
-      name: '', transport: 'stdio', url: '', command: '', args: '', headerName: '', headerValue: '',
+      name: '', transport: 'stdio', url: '', command: '', args: '', headers: [],
     });
   });
 });
