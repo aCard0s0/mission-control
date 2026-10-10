@@ -10,6 +10,13 @@ export interface McpEndpointOptions {
   headers?: Record<string, string>;
 }
 
+/** One connection header being typed. `secret` only masks the value on screen. */
+export interface McpHeaderRow {
+  name: string;
+  value: string;
+  secret: boolean;
+}
+
 /**
  * The "add an MCP server" form, which the agent detail page and the profile
  * template editor both put on screen with their own layout. What they must agree
@@ -24,10 +31,9 @@ export class McpEndpointForm {
   url = '';
   command = '';
   args = '';
-  /** One optional connection header, e.g. `Authorization: Bearer …`. Write-only: the
-   *  profile never hands a header value back, so editing starts with both blank. */
-  headerName = '';
-  headerValue = '';
+  /** Connection headers, e.g. `Authorization: Bearer …`. Write-only: the profile never hands
+   *  a value back, so editing starts with no rows. A row left fully blank is ignored. */
+  headers: McpHeaderRow[] = [];
 
   constructor(private readonly defaultTransport: McpTransport = 'http') {
     this.transport = defaultTransport;
@@ -40,7 +46,7 @@ export class McpEndpointForm {
   /** True once the submit button should be enabled. */
   valid(): boolean {
     if (!this.name.trim()) return false;
-    if (!this.stdio && !this.headerName.trim() !== !this.headerValue.trim()) return false;
+    if (!this.stdio && this.headers.some(h => !h.name.trim() !== !h.value.trim())) return false;
     return this.stdio ? !!this.command.trim() : !!this.url.trim();
   }
 
@@ -49,13 +55,22 @@ export class McpEndpointForm {
     if (!this.valid()) return null;
     return this.stdio
       ? { command: this.command.trim(), args: this.args.trim() || undefined }
-      : { url: this.url.trim(), ...this.headers() };
+      : { url: this.url.trim(), ...this.headerMap() };
   }
 
-  private headers(): Pick<McpEndpointOptions, 'headers'> {
-    const name = this.headerName.trim();
-    const value = this.headerValue.trim();
-    return name && value ? { headers: { [name]: value } } : {};
+  addHeader(): void {
+    this.headers.push({ name: '', value: '', secret: false });
+  }
+
+  removeHeader(index: number): void {
+    this.headers.splice(index, 1);
+  }
+
+  private headerMap(): Pick<McpEndpointOptions, 'headers'> {
+    const filled = this.headers.filter(h => h.name.trim() && h.value.trim());
+    return filled.length
+      ? { headers: Object.fromEntries(filled.map(h => [h.name.trim(), h.value.trim()])) }
+      : {};
   }
 
   trimmedName(): string {
@@ -69,8 +84,7 @@ export class McpEndpointForm {
     this.url = server.url ?? '';
     this.command = server.command ?? '';
     this.args = server.args ?? '';
-    this.headerName = '';
-    this.headerValue = '';
+    this.headers = [];
   }
 
   reset(): void {
@@ -79,7 +93,6 @@ export class McpEndpointForm {
     this.url = '';
     this.command = '';
     this.args = '';
-    this.headerName = '';
-    this.headerValue = '';
+    this.headers = [];
   }
 }

@@ -42,29 +42,68 @@
   </div>
   <div class="panel-b">
     <div class="mcp-add">
-      <input class="input name-in" [(ngModel)]="form.name" placeholder="server name e.g. github" />
-      <select class="select transport-in" [(ngModel)]="form.transport">
-        <option value="http">http</option>
-        <option value="sse">sse</option>
-        <option value="stdio">stdio</option>
-      </select>
+      <div class="form-grid two">
+        <div class="field">
+          <label for="mcp-add-name">server name</label>
+          <input id="mcp-add-name" class="input name-in" [(ngModel)]="form.name" placeholder="github" />
+        </div>
+        <div class="field">
+          <label for="mcp-add-transport">transport</label>
+          <select id="mcp-add-transport" class="select transport-in" [(ngModel)]="form.transport">
+            <option value="http">HTTP</option>
+            <option value="sse">SSE</option>
+            <option value="stdio">stdio</option>
+          </select>
+        </div>
+      </div>
+
       @if (form.stdio) {
-        <input class="input cmd-in" [(ngModel)]="form.command" placeholder="command e.g. npx" />
-        <input class="input args-in" [(ngModel)]="form.args" placeholder="args e.g. @modelcontextprotocol/server-github" />
+        <div class="section-label mono">STDIO COMMAND</div>
+        <div class="form-grid two">
+          <div class="field">
+            <label for="mcp-add-command">executable</label>
+            <input id="mcp-add-command" class="input cmd-in" [(ngModel)]="form.command" placeholder="npx" />
+          </div>
+          <div class="field">
+            <label for="mcp-add-args">arguments</label>
+            <input id="mcp-add-args" class="input args-in" [(ngModel)]="form.args"
+                   placeholder="-y @modelcontextprotocol/server-github" />
+          </div>
+        </div>
       } @else {
-        <input class="input url-in" [(ngModel)]="form.url" placeholder="url e.g. https://mcp.example.com" />
-        <input class="input header-name-in" [(ngModel)]="form.headerName" placeholder="header e.g. Authorization"
-               aria-label="header name" />
-        <input class="input header-value-in" type="password" autocomplete="off" [(ngModel)]="form.headerValue"
-               [placeholder]="editingMcp() ? 'header value — blank keeps current' : 'header value e.g. Bearer …'"
-               aria-label="header value" />
+        <div class="section-label mono">ENDPOINT</div>
+        <div class="field">
+          <label for="mcp-add-url">URL</label>
+          <input id="mcp-add-url" class="input url-in" [(ngModel)]="form.url" placeholder="https://mcp.example.com/mcp" />
+        </div>
+
+        <div class="kv-head">
+          <span class="section-label mono">CONNECTION HEADERS</span>
+          <button class="btn sm ghost" (click)="form.addHeader()">+ header</button>
+        </div>
+        @for (header of form.headers; track $index; let i = $index) {
+          <div class="kv-row">
+            <input class="input header-name-in" [(ngModel)]="header.name" placeholder="Authorization"
+                   aria-label="header name" />
+            <input class="input header-value-in" [type]="header.secret ? 'password' : 'text'" autocomplete="off"
+                   [(ngModel)]="header.value" placeholder="Bearer …" aria-label="header value" />
+            <label class="secret-toggle mono"><input type="checkbox" [(ngModel)]="header.secret" /> secret</label>
+            <button class="btn sm danger ghost" (click)="form.removeHeader(i)">remove</button>
+          </div>
+        }
+        @if (editingMcp()) {
+          <p class="lock-hint">stored header values are never shown — add none to keep them, or any to replace them all.</p>
+        }
       }
-      <button class="btn primary" [disabled]="!form.valid()" (click)="saveMcp()">
-        {{ editingMcp() ? 'update' : 'connect' }}
-      </button>
-      @if (editingMcp()) {
-        <button class="btn ghost" (click)="resetMcpForm()">cancel</button>
-      }
+
+      <div class="actions">
+        @if (editingMcp()) {
+          <button class="btn ghost" (click)="resetMcpForm()">cancel</button>
+        }
+        <button class="btn primary" [disabled]="!form.valid()" (click)="saveMcp()">
+          {{ editingMcp() ? 'update' : 'connect' }}
+        </button>
+      </div>
     </div>
     <p class="lock-hint">equivalent CLI: <code>hermes -p {{ agent().name }} mcp install &lt;server&gt;</code></p>
   </div>
