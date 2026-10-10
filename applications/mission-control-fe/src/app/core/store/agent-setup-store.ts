@@ -1,4 +1,5 @@
 import { inject, Injectable, signal } from '@angular/core';
+import { ApiCodexLogin } from '../api/api-types';
 import { AgentSetup, AuthProvider, ChatMessage, SessionInfo } from '../models';
 import { AgentStore } from './agent-store';
 import { ContainerStore } from './container-store';
@@ -106,6 +107,23 @@ export class AgentSetupStore {
     return this.ctx.api.agents.authProviders(container.hostId, containerId)
       .then(list => list.map(toAuthProvider))
       .catch(() => []);
+  }
+
+  /** Starts (or restarts) the ChatGPT device login in this agent's container. The login is
+   *  container-wide — every profile inherits it — so the agent only names the container. */
+  startCodexLogin(agentId: string): Promise<ApiCodexLogin | null> {
+    const resolved = this.agents.resolve(agentId);
+    if (!resolved) { this.ctx.gone('profile'); return Promise.resolve(null); }
+    return this.ctx.api.agents.startCodexLogin(resolved.ref.hostId, resolved.ref.containerId)
+      .catch(e => { this.ctx.toastFailure('ChatGPT login', e); return null; });
+  }
+
+  /** Where that login stands; null when it could not be read this time. */
+  codexLogin(agentId: string): Promise<ApiCodexLogin | null> {
+    const resolved = this.agents.resolve(agentId);
+    if (!resolved) return Promise.resolve(null);
+    return this.ctx.api.agents.codexLogin(resolved.ref.hostId, resolved.ref.containerId)
+      .catch(() => null);
   }
 
   /** Lists this agent's recorded sessions. */

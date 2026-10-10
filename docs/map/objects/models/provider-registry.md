@@ -58,7 +58,7 @@ the form opens on it and warns instead.
 
 ## Shape
 
-`Provider(key, label, envVar, oauth, hasCatalog)` — `agents/ModelProviderRegistry.java:50`.
+`Provider(key, label, envVar, oauth, hasCatalog)` — `agents/ModelProviderRegistry.java:51`.
 ~29 entries, `agents/ModelProviderRegistry.java:60`.
 
 - `envVar` null means the provider takes no key (OAuth or resolved elsewhere).

@@ -28,6 +28,7 @@ GET /api/agents/dh-local/c-1/atlas/skills/ops/content
 GET /api/agents/dh-local/c-1/atlas/webhooks
 GET /api/agents/dh-local/c-1/atlas/webhooks/alerts/secret
 GET /api/agents/dh-local/c-1/auth-providers
+GET /api/agents/dh-local/c-1/codex-login
 GET /api/agents?hostId=dh-local&containerId=c-1
 GET /api/board/tasks
 GET /api/containers
@@ -68,6 +69,7 @@ POST /api/agents/dh-local/c-1/atlas/mcp/github/test
 POST /api/agents/dh-local/c-1/atlas/skills
 POST /api/agents/dh-local/c-1/atlas/webhooks
 POST /api/agents/dh-local/c-1/atlas/webhooks/alerts/test
+POST /api/agents/dh-local/c-1/codex-login
 POST /api/containers
 POST /api/containers/dh-local/c-1/start
 POST /api/containers/dh-local/c-1/stop

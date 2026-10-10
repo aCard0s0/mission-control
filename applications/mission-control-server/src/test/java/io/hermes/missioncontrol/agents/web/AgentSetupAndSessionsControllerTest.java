@@ -23,11 +23,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.hermes.missioncontrol.agents.CodexLogin;
 import io.hermes.missioncontrol.agents.HermesProfiles;
 import io.hermes.missioncontrol.agents.HermesSetup;
 import io.hermes.missioncontrol.credentials.CredentialService;
 import io.hermes.missioncontrol.agents.api.AgentSetupDto;
 import io.hermes.missioncontrol.agents.api.AuthProviderDto;
+import io.hermes.missioncontrol.agents.api.CodexLoginDto;
 import io.hermes.missioncontrol.agents.api.EnvEntry;
 import io.hermes.missioncontrol.agents.api.SessionDto;
 import io.hermes.missioncontrol.errors.ApiExceptionHandler;
@@ -50,6 +52,7 @@ class AgentSetupAndSessionsControllerTest {
   private HermesProfiles profiles;
   private HostService hosts;
   private CredentialService credentials;
+  private CodexLogin codexLogin;
   private MockMvc mvc;
 
   @BeforeEach
@@ -58,9 +61,10 @@ class AgentSetupAndSessionsControllerTest {
     profiles = mock(HermesProfiles.class);
     hosts = mock(HostService.class);
     credentials = mock(CredentialService.class);
+    codexLogin = mock(CodexLogin.class);
     mvc = MockMvcBuilders
         .standaloneSetup(
-            new AgentSetupController(setup, hosts, credentials),
+            new AgentSetupController(setup, hosts, credentials, codexLogin),
             new AgentSessionsController(profiles, hosts))
         .setControllerAdvice(new ApiExceptionHandler())
         .build();
@@ -81,6 +85,22 @@ class AgentSetupAndSessionsControllerTest {
         .andExpect(jsonPath("$[0].label").value("Nous Portal"));
 
     verify(setup).setup(HOST, CONTAINER, "default");
+  }
+
+  @Test
+  void theCodexLoginIsStartedAndReadBackPerContainer() throws Exception {
+    hostIsConnected(hosts);
+    when(codexLogin.start(HOST, CONTAINER)).thenReturn(
+        new CodexLoginDto("pending", "https://auth.openai.com/codex/device", "OY4P-34AG8", null));
+    when(codexLogin.status(HOST, CONTAINER)).thenReturn(
+        new CodexLoginDto("succeeded", null, null, null));
+
+    mvc.perform(post("/api/agents/" + HOST.id() + "/" + CONTAINER + "/codex-login"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("OY4P-34AG8"));
+    mvc.perform(get("/api/agents/" + HOST.id() + "/" + CONTAINER + "/codex-login"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("succeeded"));
   }
 
   @Test
