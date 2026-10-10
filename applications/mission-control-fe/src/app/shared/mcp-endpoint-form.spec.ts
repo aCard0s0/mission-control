@@ -33,6 +33,15 @@ describe('McpEndpointForm endpoint', () => {
       .toEqual({ command: 'npx', args: undefined });
   });
 
+  it('adds a header only when both its name and value are filled, and never for stdio', () => {
+    expect(filled({ headerName: ' Authorization ', headerValue: ' Bearer t ' }).endpoint())
+      .toEqual({ url: 'https://mcp.example.test/mcp', headers: { Authorization: 'Bearer t' } });
+    expect(filled({ headerName: 'Authorization' }).valid()).toBe(false);
+    expect(filled({ headerValue: 'Bearer t' }).valid()).toBe(false);
+    expect(filled({ transport: 'stdio', command: 'npx', headerName: 'X', headerValue: 'y' }).endpoint())
+      .toEqual({ command: 'npx', args: undefined });
+  });
+
   it('answers null rather than a half-built endpoint', () => {
     expect(filled({ name: '' }).endpoint()).toBeNull();
     expect(filled({ transport: 'stdio', command: '' }).endpoint()).toBeNull();
@@ -54,6 +63,8 @@ describe('McpEndpointForm load and reset', () => {
     form.load({ name: 'remote', transport: 'http', url: 'https://mcp.example.test/mcp' });
     form.reset();
 
-    expect(form).toMatchObject({ name: '', transport: 'stdio', url: '', command: '', args: '' });
+    expect(form).toMatchObject({
+      name: '', transport: 'stdio', url: '', command: '', args: '', headerName: '', headerValue: '',
+    });
   });
 });
