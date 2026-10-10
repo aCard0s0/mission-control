@@ -25,13 +25,6 @@
   .key-in { width: 180px; flex: none; }
 }
 
-.codex-login {
-  padding-top: 10px;
-  font-size: 12px;
-  p { margin: 0 0 6px; }
-  .code { font-size: 13px; letter-spacing: 1px; user-select: all; }
-}
-
 .msg-block {
   border-bottom: 1px solid var(--line);
   &:last-of-type { border-bottom: 0; }

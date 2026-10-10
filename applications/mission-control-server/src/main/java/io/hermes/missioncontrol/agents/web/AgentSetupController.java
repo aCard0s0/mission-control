@@ -1,10 +1,8 @@
 package io.hermes.missioncontrol.agents.web;
 
-import io.hermes.missioncontrol.agents.CodexLogin;
 import io.hermes.missioncontrol.agents.HermesSetup;
 import io.hermes.missioncontrol.agents.api.AgentSetupDto;
 import io.hermes.missioncontrol.agents.api.AuthProviderDto;
-import io.hermes.missioncontrol.agents.api.CodexLoginDto;
 import io.hermes.missioncontrol.agents.api.EnvEntry;
 import io.hermes.missioncontrol.credentials.CredentialService;
 import io.hermes.missioncontrol.hosts.HostService;
@@ -27,14 +25,11 @@ class AgentSetupController {
   private final HermesSetup setup;
   private final HostService hosts;
   private final CredentialService credentials;
-  private final CodexLogin codexLogin;
 
-  AgentSetupController(
-      HermesSetup setup, HostService hosts, CredentialService credentials, CodexLogin codexLogin) {
+  AgentSetupController(HermesSetup setup, HostService hosts, CredentialService credentials) {
     this.setup = setup;
     this.hosts = hosts;
     this.credentials = credentials;
-    this.codexLogin = codexLogin;
   }
 
   /** Container-level auth-provider status (e.g. Nous Portal OAuth login), read
@@ -46,21 +41,6 @@ class AgentSetupController {
   public List<AuthProviderDto> authProviders(
       @PathVariable String hostId, @PathVariable String containerId) {
     return setup.setup(hosts.requireConnected(hostId), containerId, "default").authProviders();
-  }
-
-  /** Starts the ChatGPT (OpenAI Codex) device login in the container, replacing any earlier
-   *  one, and answers with the URL and code the operator enters in a browser. */
-  @PostMapping("/codex-login")
-  public CodexLoginDto startCodexLogin(
-      @PathVariable String hostId, @PathVariable String containerId) {
-    return codexLogin.start(hosts.requireConnected(hostId), containerId);
-  }
-
-  /** Where that login stands — polled by the dashboard until it succeeds or fails. */
-  @GetMapping("/codex-login")
-  public CodexLoginDto codexLogin(
-      @PathVariable String hostId, @PathVariable String containerId) {
-    return codexLogin.status(hosts.requireConnected(hostId), containerId);
   }
 
   @GetMapping("/{name}/setup")

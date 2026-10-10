@@ -45,32 +45,16 @@
             <mc-status [status]="p.ok ? 'up' : 'off'" [label]="p.label" />
             <span class="dim status-text">{{ p.status }}</span>
             <span class="spacer"></span>
-            @if (p.providerKey === 'openai-codex' && !p.ok) {
-              <button class="btn sm primary" [disabled]="codexBusy()" (click)="startCodexLogin()">
-                {{ codexBusy() ? 'starting…' : 'log in with ChatGPT' }}
-              </button>
-            } @else if (p.hint) {
+            @if (p.hint) {
               <span class="chip info mono">run: {{ p.hint }}</span>
-              <button class="btn sm ghost" (click)="terminal.open()">open terminal</button>
-            }
-          </div>
-        }
-        @if (codex(); as c) {
-          <div class="codex-login" role="status">
-            @switch (c.state) {
-              @case ('pending') {
-                <p>Open <a [href]="c.url" target="_blank" rel="noopener">{{ c.url }}</a> and enter
-                  <span class="chip info mono code">{{ c.code }}</span></p>
-                <p class="dim">waiting for sign-in… the code expires after 15 minutes. If OpenAI
-                  refuses it, turn on <em>device code authorization for Codex</em> in ChatGPT's
-                  Settings → Security.</p>
-              }
-              @case ('succeeded') { <p>ChatGPT login saved — every profile in this container can use <code>openai-codex</code>.</p> }
-              @case ('failed') { <p class="chip warn mono">{{ c.message }}</p> }
+              <button class="btn sm ghost" (click)="openTerminal(p.hint)">open terminal</button>
             }
           </div>
         }
         @if (!s.authProviders.length) { <p class="dim">No auth providers detected.</p> }
+        <p class="lock-hint">a login is container-wide, this profile's model is not — point it at
+          one with <code>{{ modelHint() }}</code>
+          <button class="btn sm ghost" (click)="openTerminal(modelHint())">open terminal</button></p>
       </div>
     </div>
 
