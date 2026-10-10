@@ -23,6 +23,7 @@ export class AgentMcpStore {
     if (!this.agents.byId(agentId)) return this.ctx.gone('profile');
     return this.agents.mutate(agentId, 'mcp add', ref => this.ctx.api.agents.mcp.add(ref, {
       name, transport, url: opts?.url, command: opts?.command, args: opts?.args,
+      headers: opts?.headers,
     }));
   }
 
@@ -42,7 +43,7 @@ export class AgentMcpStore {
     return this.agents.mutate(agentId, 'MCP update',
       ref => this.ctx.api.agents.mcp.update(ref, oldName, {
         name, transport, url: opts?.url, command: opts?.command, args: opts?.args,
-        enabled: existing.enabled,
+        enabled: existing.enabled, headers: opts?.headers,
       }));
   }
 
