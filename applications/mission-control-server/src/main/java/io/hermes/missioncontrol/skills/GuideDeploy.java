@@ -87,7 +87,8 @@ public class GuideDeploy {
       try {
         name = registry.definition(serverId).name();
         boolean connected = mcpCatalog
-            .connectIfAbsent(host, containerId, profile, new ConnectCatalogMcpRequest(serverId, name))
+            .connectIfAbsent(host, containerId, profile,
+                new ConnectCatalogMcpRequest(serverId, AgentMcpCatalogService.aliasFor(name)))
             .isPresent();
         // Either way the server the guide wanted is on the agent, so it belongs in the
         // umbrella document below. An alias already there reads as skipped rather than

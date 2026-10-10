@@ -250,4 +250,25 @@ public class AgentMcpCatalogService {
     if (!ALIAS.matcher(result).matches()) throw new IllegalArgumentException("invalid MCP alias");
     return result;
   }
+
+  /**
+   * A catalog entry's display name turned into an alias, for the callers that have no operator
+   * to ask: a group deploy and a guide deploy both connect every server they name.
+   *
+   * <p>A display name is prose and an alias is a config key, so the two alphabets differ — and
+   * passing the name straight through failed every entry whose name is not already an alias,
+   * which included two of the four the catalog seeds (<em>Sequential Thinking</em>,
+   * <em>Postgres MCP</em>). Deliberately not folded into {@link #alias}: that one is also the
+   * lookup key on sync, unlink, custom and forget, where coercing what the caller asked for
+   * into something valid would answer about a different link than the one named.
+   *
+   * <p>A name of nothing but punctuation still throws — there is no alias in it to find.
+   */
+  public static String aliasFor(String displayName) {
+    String slug = (displayName == null ? "" : displayName.trim())
+        .replaceAll("[^A-Za-z0-9_.-]+", "-")
+        .replaceAll("^[^A-Za-z0-9]+", "")
+        .replaceAll("[^A-Za-z0-9]+$", "");
+    return alias(slug);
+  }
 }

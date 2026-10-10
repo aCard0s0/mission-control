@@ -253,6 +253,27 @@ describe('AgentMcpPanel catalog links', () => {
     expect(store.agentMcp.connectCatalog).toHaveBeenCalledWith('a-1', 'mcp-browser', 'browser');
   });
 
+  it('offers a display name as an alias the connect will accept', async () => {
+    // a display name is prose and an alias is a config key; the name used to go in verbatim
+    // and the connect answered `invalid MCP alias` for every entry named like this one
+    const agent = profile([]);
+    const store = storeStub(agent, [
+      catalogServer({ name: 'TP MCP Server', runtimeState: 'running' }),
+    ]);
+    const fixture = render(store, agent);
+    pickCatalog(fixture, 'mcp-browser');
+    await fixture.whenStable();
+
+    expect(el(fixture).querySelector<HTMLInputElement>('.catalog-connect .input')!.value)
+      .toBe('TP-MCP-Server');
+
+    el(fixture).querySelector<HTMLButtonElement>('.catalog-connect .btn')!.click();
+    await fixture.whenStable();
+
+    expect(store.agentMcp.connectCatalog)
+      .toHaveBeenCalledWith('a-1', 'mcp-browser', 'TP-MCP-Server');
+  });
+
   it('probes the alias it just linked, so the row is not left unchecked', async () => {
     const linked = server('browser', { origin: 'catalog', catalogServerId: 'mcp-browser' });
     const agent = profile([linked]);

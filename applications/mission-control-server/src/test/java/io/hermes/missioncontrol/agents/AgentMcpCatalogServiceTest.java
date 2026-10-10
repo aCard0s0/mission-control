@@ -131,6 +131,27 @@ class AgentMcpCatalogServiceTest {
   // is validated on the way in on every path that takes one.
 
   @Test
+  void aDisplayNameBecomesAnAliasForTheCallersThatHaveNoOperatorToAsk() {
+    // the two the catalog seeds with a space in the name, which a deploy used to fail on
+    assertEquals("Sequential-Thinking", AgentMcpCatalogService.aliasFor("Sequential Thinking"));
+    assertEquals("Postgres-MCP", AgentMcpCatalogService.aliasFor("Postgres MCP"));
+    // already an alias: unchanged
+    assertEquals("Context7", AgentMcpCatalogService.aliasFor("Context7"));
+    assertEquals("my.server_1", AgentMcpCatalogService.aliasFor("my.server_1"));
+    // the alias has to start alphanumeric and reads better not trailing a separator
+    assertEquals("etc", AgentMcpCatalogService.aliasFor("  ../etc  "));
+    assertEquals("Redis", AgentMcpCatalogService.aliasFor("-Redis-"));
+    assertEquals("a-b", AgentMcpCatalogService.aliasFor("a  ()  b"));
+    // a 100-character name is the longest the catalog takes, and the longest alias there is
+    assertEquals("a".repeat(100), AgentMcpCatalogService.aliasFor("a".repeat(100)));
+    // nothing in it to find
+    for (String empty : List.of("", "   ", "()")) {
+      assertEquals("invalid MCP alias", assertThrows(IllegalArgumentException.class,
+          () -> AgentMcpCatalogService.aliasFor(empty)).getMessage());
+    }
+  }
+
+  @Test
   void anAliasThatIsNotASafeIdentifierIsRefusedOnEveryPathThatTakesOne() {
     for (String bad : List.of("", "   ", "../etc", "-leading", "a".repeat(101), "with space")) {
       assertEquals("invalid MCP alias", assertThrows(IllegalArgumentException.class,

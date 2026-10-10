@@ -12,6 +12,21 @@ import { McpEndpointForm } from '../shared/mcp-endpoint-form';
 import { StatusDot } from '../shared/status-dot';
 
 /**
+ * A catalog entry's display name turned into the alias offered as a default. A display name is
+ * prose and an alias is a key in the Agent's config, so the two alphabets differ — the name went
+ * in verbatim and any entry not already named like an alias came back `invalid MCP alias` from
+ * the connect, which included two of the four the catalog seeds. Mirrors
+ * `AgentMcpCatalogService.aliasFor`, and is applied here as well so the box shows the alias that
+ * will actually be created — the probe that follows a connect looks the new server up by it.
+ */
+function aliasFor(displayName: string): string {
+  return displayName.trim()
+    .replace(/[^A-Za-z0-9_.-]+/g, '-')
+    .replace(/^[^A-Za-z0-9]+/, '')
+    .replace(/[^A-Za-z0-9]+$/, '');
+}
+
+/**
  * The profile's MCP tab: connect an alias to a catalog entry, edit servers
  * configured directly on the profile, and probe what each one answers. Every
  * mutation goes through the store; what lives here is the form and the
@@ -73,7 +88,7 @@ export class AgentMcpPanel {
 
   protected selectCatalogServer(id: string): void {
     this.catalogServerId = id;
-    this.catalogAlias = this.catalog.byId(id)?.name ?? '';
+    this.catalogAlias = aliasFor(this.catalog.byId(id)?.name ?? '');
   }
 
   protected catalogConnectLabel(): string {

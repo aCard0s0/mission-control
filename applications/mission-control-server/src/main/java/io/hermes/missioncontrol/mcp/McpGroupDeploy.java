@@ -52,7 +52,8 @@ public class McpGroupDeploy {
       try {
         name = registry.definition(serverId).name();
         AgentProfileDto connected = mcpCatalog.connectIfAbsent(host, containerId, profile,
-            new ConnectCatalogMcpRequest(serverId, name)).orElse(null);
+            new ConnectCatalogMcpRequest(serverId, AgentMcpCatalogService.aliasFor(name)))
+            .orElse(null);
         if (connected == null) {
           parts.add(new DeployedPart("mcp", name, DeployedPart.SKIPPED, "already connected"));
         } else {
