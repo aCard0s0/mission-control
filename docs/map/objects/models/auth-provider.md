@@ -17,14 +17,16 @@ Fourth of the four "provider"-shaped nouns, and the only one that is per-contain
 ## Why this shape
 
 Container-scoped rather than profile-scoped, and the controller shows why: it answers from the
-`"default"` profile's setup (`agents/web/AgentSetupController.java:48`). Credentials live in the
+`"default"` profile's setup (`agents/web/AgentSetupController.java:43`). Credentials live in the
 container's data volume, not in one profile — so asking any profile answers for all of them, and
 the endpoint takes no profile name.
 
-Read-only. Mission Control reports what is there; hermes owns the credential store. The one
-login the dashboard can *start* is ChatGPT's (`agents/CodexLogin.java`, `POST …/codex-login`):
-it runs hermes' own device flow detached in the container and reads the transcript back, so
-hermes still writes the credential.
+Read-only. Mission Control reports what is there; hermes owns the credential store. A row that
+is not logged in carries hermes' own `run: …` hint (`hermes portal`, `hermes auth add
+openai-codex`), and the Setup tab's **open terminal** types that line into the agent's
+container shell — the device flow runs in the terminal, never from the dashboard. Logging in
+does not re-point a profile: `model.default` stays what it was, so the same panel hands
+`hermes model` to the terminal as well.
 
 Each row names the [Provider](provider-registry.md) key it serves — `providerKey`, mapped from
 hermes' label in `HermesEnvCatalog.AUTH_PROVIDER_KEYS` (`Nous Portal` → `nous`, `OpenAI Codex`
@@ -75,4 +77,4 @@ the container. See also `ApiKeyStatusDto` and `ApiKeyProviderDto` in the same pa
 ## See
 
 - Source: `applications/mission-control-server/src/main/java/io/hermes/missioncontrol/agents/HermesSetup.java`
-- Controller: `agents/web/AgentSetupController.java:45`
+- Controller: `agents/web/AgentSetupController.java:40`

@@ -131,14 +131,6 @@ const cases: Record<string, Case> = {
     call: a => a.agents.authProviders('dh-local', 'c-1'), method: 'GET',
     url: '/api/agents/dh-local/c-1/auth-providers',
   },
-  'agents.startCodexLogin': {
-    call: a => a.agents.startCodexLogin('dh-local', 'c-1'), method: 'POST',
-    url: '/api/agents/dh-local/c-1/codex-login',
-  },
-  'agents.codexLogin': {
-    call: a => a.agents.codexLogin('dh-local', 'c-1'), method: 'GET',
-    url: '/api/agents/dh-local/c-1/codex-login',
-  },
 
   // ── skills ─────────────────────────────────────────────────────────────
   'agents.skills.setEnabled': {

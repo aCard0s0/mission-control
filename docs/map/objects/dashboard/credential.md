@@ -70,7 +70,7 @@ Citations: `applications/mission-control-server/src/main/resources/schema.sql:31
 - **joins:** nothing, deliberately. Three *request* fields carry an id into other writes —
   `EnvEntry.credentialId`, `CreateAgentRequest.apiKeyCredentialId`, `SecretInput.credentialId` —
   and each is resolved and discarded before the write lands.
-- **looks-like-but-is-not:** an **auth provider** (`agents/web/AgentSetupController.java:45`),
+- **looks-like-but-is-not:** an **auth provider** (`agents/web/AgentSetupController.java:40`),
   which is a read-only report of what one container is logged into; a **provider** in any of its
   [four senses](../models/CONTEXT.md); a [profile template's](../agents/profile-template.md)
   `secrets`, which is a blueprint's own copy and not a library.

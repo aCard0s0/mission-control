@@ -3,11 +3,12 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AgentSetupStore } from '../core/store/agent-setup-store';
+import { ContainerStore } from '../core/store/container-store';
 import { CredentialStore } from '../core/store/credential-store';
 import { TerminalRequestStore } from '../core/store/terminal-request-store';
-import { ApiCodexLogin } from '../core/api/api-types';
 import { AgentProfile, Credential } from '../core/models';
 import { StatusDot } from '../shared/status-dot';
+import { hermesLine, HERMES_COMMANDS } from '../core/hermes-commands';
 
 /**
  * The profile's Setup tab: what its `.env` holds, which auth providers are
@@ -37,6 +38,7 @@ export class AgentSetupPanel {
   protected readonly setup = inject(AgentSetupStore);
   protected readonly terminal = inject(TerminalRequestStore);
   private readonly credentials = inject(CredentialStore);
+  private readonly containers = inject(ContainerStore);
 
   protected readonly profileSetup = computed(() => this.setup.setupOf(this.agent().id));
   protected readonly setupLoading = computed(() => this.setup.isSetupLoading(this.agent().id));
@@ -49,9 +51,11 @@ export class AgentSetupPanel {
    *  {@link envDrafts}: the picker writes it from a `(change)` handler, not `ngModel`. */
   protected readonly envPicks = signal<Record<string, string>>({});
   protected envDrafts: Record<string, string> = {};
-  /** The ChatGPT device login this tab started, while it is worth showing. */
-  protected readonly codex = signal<ApiCodexLogin | null>(null);
-  protected readonly codexBusy = signal(false);
+  /** `hermes [-p name] model` — the interactive picker that re-points this profile at a login.
+   *  An OAuth login is container-wide but `model.default` is the profile's, so a freshly
+   *  logged-in container still answers with whatever model the profile had before. */
+  protected readonly modelHint = computed(() =>
+    hermesLine(HERMES_COMMANDS.find(c => c.cmd === 'model')!, this.agent().name));
 
   constructor() {
     // read on open, and whenever the tab is showing a different profile; a
@@ -62,32 +66,18 @@ export class AgentSetupPanel {
         this.msgOpen.set(null);
         this.envDrafts = {};
         this.envPicks.set({});
-        this.codex.set(null);
         void this.setup.setup(id);
       });
     });
-    // while a login waits on the operator's browser, read it back until hermes settles it;
-    // each read is one `cat` in the container, not a `hermes status`
-    effect(onCleanup => {
-      if (this.codex()?.state !== 'pending') return;
-      const id = this.agent().id;
-      const timer = setInterval(() => void this.pollCodexLogin(id), 3_000);
-      onCleanup(() => clearInterval(timer));
-    });
   }
 
-  protected startCodexLogin(): void {
-    this.codexBusy.set(true);
-    this.setup.startCodexLogin(this.agent().id)
-      .then(login => this.codex.set(login))
-      .finally(() => this.codexBusy.set(false));
-  }
-
-  private async pollCodexLogin(id: string): Promise<void> {
-    const login = await this.setup.codexLogin(id);
-    if (!login || login.state === 'pending' || id !== this.agent().id) return;
-    this.codex.set(login);
-    if (login.state === 'succeeded') this.refresh();
+  /** Types `line` at this agent's container shell, unrun — the operator presses Enter. The
+   *  shell, not the dashboard, runs a login: a device flow prints its URL and code there. */
+  protected openTerminal(line: string): void {
+    const container = this.containers.byId(this.agent().containerId);
+    this.terminal.open(container
+      ? { hostId: container.hostId, containerId: container.id, label: container.name, insert: line }
+      : { insert: line });
   }
 
   protected refresh(): void {
